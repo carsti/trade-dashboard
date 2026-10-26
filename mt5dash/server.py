@@ -80,10 +80,10 @@ class AppState:
             self._wake.wait(timeout=int(self.cfg.data.get("refresh_seconds", 60)))
             self._wake.clear()
 
-    def report(self, t_from, t_to, group):
+    def report(self, t_from, t_to, group, accounts=None):
         with self.lock:
             snaps = list(self.snapshots.values())
-        return analytics.build_report(snaps, self.cfg.data["bot_names"], t_from, t_to, group)
+        return analytics.build_report(snaps, self.cfg.data["bot_names"], t_from, t_to, group, accounts)
 
 
 def _int_or_none(v):
@@ -157,7 +157,8 @@ def make_handler(state: AppState, token: str):
                 t_from = _int_or_none(q.get("from", [None])[0])
                 t_to = _int_or_none(q.get("to", [None])[0])
                 group = q.get("group", ["account"])[0]
-                rep = state.report(t_from, t_to, "bot" if group == "bot" else "account")
+                accs = {a for a in q.get("accounts", [""])[0].split(",") if a} or None
+                rep = state.report(t_from, t_to, "bot" if group == "bot" else "account", accs)
                 if u.path == "/api/report":
                     return self._json(rep)
                 return self._send(200, _csv(rep).encode("utf-8-sig"), "text/csv; charset=utf-8",

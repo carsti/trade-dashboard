@@ -6,6 +6,7 @@ Eingabe sind normalisierte Deals (dicts) wie sie mt5_source / demo_source liefer
 """
 from __future__ import annotations
 
+import time
 from collections import Counter, defaultdict
 
 # MT5-Konstanten
@@ -17,6 +18,7 @@ DEAL_ENTRY_INOUT = 2
 DEAL_ENTRY_OUT_BY = 3
 
 MANUAL_NAME = "Manuell"
+DAY = 86400
 
 
 def deal_net(d: dict) -> float:
@@ -101,6 +103,8 @@ def _stats(closed: list[dict]) -> dict:
         "gross_profit": round(gross_win, 2),
         "gross_loss": round(gross_loss, 2),
         "net": round(sum(nets), 2),
+        "avg_win": round(gross_win / len(wins), 2) if wins else None,
+        "avg_loss": round(gross_loss / len(losses), 2) if losses else None,
         "costs": round(sum(p["costs"] for p in closed), 2),
         "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else None,
         "avg_trade": round(sum(nets) / n, 2) if n else None,
@@ -123,24 +127,51 @@ def _curve(closed: list[dict]) -> list[list]:
     return pts
 
 
+def _daily(closed: list[dict]) -> list[list]:
+    """Netto je Kalendertag (Serverzeit) als [[tagesbeginn, netto], ...]."""
+    days: dict[int, float] = defaultdict(float)
+    for p in closed:
+        days[p["close_time"] - p["close_time"] % DAY] += p["net"]
+    return [[d, round(v, 2)] for d, v in sorted(days.items())]
+
+
+def _pct(net: float, base: float) -> float | None:
+    return round(100 * net / base, 2) if base > 0 else None
+
+
 def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: int | None,
-                 group: str = "account") -> dict:
+                 group: str = "account", accounts: set[str] | None = None, now: int | None = None) -> dict:
     """Erzeugt den kompletten Dashboard-Report.
 
     snapshots: je Konto {"account": {...}, "deals": [...], "open_positions": [...]}
     group: "account" → ein Eintrag pro Bot und Konto, "bot" → gleiche Bots über Konten zusammengefasst
+    accounts: nur diese Konto-Keys auswerten (None = alle); die Kontoliste enthält trotzdem alle Konten
+    now: Bezugszeit für Heute/7 T/30 T (unabhängig vom gewählten Zeitraum)
+
+    Rendite in % bezieht sich auf das Startkapital des Zeitraums: Balance minus alles, was ab
+    Zeitraumbeginn realisiert wurde. Ein- und Auszahlungen im Zeitraum werden dabei nicht herausgerechnet.
     """
+    now = int(time.time()) if now is None else now
+    today = now - now % DAY
+    recent_from = {"today": today, "d7": today - 6 * DAY, "d30": today - 29 * DAY}
     def in_range(t):
         return (t_from is None or t >= t_from) and (t_to is None or t < t_to)
 
     entries: dict[tuple, dict] = {}
     accounts_out = []
+    per_cur: dict[str, dict] = {}   # Währung → Konto-Summen, Startkapital, alle/realisierte Positionen
 
     for snap in snapshots:
         acc = snap["account"]
         key = acc["key"]
         currency = acc.get("currency", "")
         positions = build_positions(snap.get("deals", []))
+        closed_all = [p for p in positions if p["closed"]]
+        start_balance = None
+        if acc.get("balance") is not None:
+            later = sum(p["net"] for p in closed_all if t_from is None or p["close_time"] >= t_from)
+            start_balance = round(acc["balance"] - later, 2)
+        selected = accounts is None or key in accounts
 
         comments_by_magic: dict[int, Counter] = defaultdict(Counter)
         for p in positions:
@@ -156,35 +187,47 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
                 e = entries[gk] = {
                     "id": f"{key}:{magic}" if group == "account" else f"{name}|{currency}",
                     "name": name, "currency": currency,
-                    "accounts": [], "magics": [],
+                    "accounts": [], "account_keys": [], "magics": [], "base": 0.0,
                     "closed": [], "floating": 0.0, "open_count": 0,
                 }
             if acc["label"] not in e["accounts"]:
                 e["accounts"].append(acc["label"])
+            if key not in e["account_keys"]:
+                e["account_keys"].append(key)
+                e["base"] += start_balance or 0.0
             if magic not in e["magics"]:
                 e["magics"].append(magic)
             return e
 
-        acc_closed_net = 0.0
-        for p in positions:
-            if p["closed"] and in_range(p["close_time"]):
-                entry_for(p["magic"])["closed"].append(p)
-                acc_closed_net += p["net"]
+        in_period = [p for p in closed_all if in_range(p["close_time"])]
+        acc_closed_net = sum(p["net"] for p in in_period)
+        acc_floating = sum(op.get("profit", 0.0) + op.get("swap", 0.0) for op in snap.get("open_positions", []))
 
-        acc_floating = 0.0
-        for op in snap.get("open_positions", []):
-            fl = op.get("profit", 0.0) + op.get("swap", 0.0)
-            e = entry_for(op.get("magic", 0))
-            e["floating"] += fl
-            e["open_count"] += 1
-            acc_floating += fl
+        if selected:
+            for p in in_period:
+                entry_for(p["magic"])["closed"].append(p)
+            for op in snap.get("open_positions", []):
+                e = entry_for(op.get("magic", 0))
+                e["floating"] += op.get("profit", 0.0) + op.get("swap", 0.0)
+                e["open_count"] += 1
+            c = per_cur.setdefault(currency, {"balance": 0.0, "equity": 0.0, "base": 0.0,
+                                              "all": [], "period": [], "open_count": 0})
+            c["balance"] += acc.get("balance") or 0.0
+            c["equity"] += acc.get("equity") or 0.0
+            c["base"] += start_balance or 0.0
+            c["all"] += closed_all
+            c["period"] += in_period
+            c["open_count"] += len(snap.get("open_positions", []))
 
         accounts_out.append({
             **{k: acc.get(k) for k in ("key", "label", "login", "server", "currency", "balance",
                                        "equity", "margin_level", "leverage", "status", "error", "updated")},
             "net": round(acc_closed_net, 2),
+            "return_pct": _pct(acc_closed_net, start_balance or 0.0),
             "floating": round(acc_floating, 2),
             "open_count": len(snap.get("open_positions", [])),
+            "trades": len(in_period),
+            "selected": selected,
         })
 
     bots = []
@@ -194,8 +237,9 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
         stats = _stats(e["closed"])
         bots.append({
             "id": e["id"], "name": e["name"], "currency": e["currency"],
-            "accounts": e["accounts"], "magics": sorted(e["magics"]),
+            "accounts": e["accounts"], "account_keys": e["account_keys"], "magics": sorted(e["magics"]),
             **stats,
+            "return_pct": _pct(stats["net"], e["base"]),
             "floating": round(e["floating"], 2), "open_count": e["open_count"],
             "curve": _curve(e["closed"]),
         })
@@ -219,5 +263,18 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
         t["profit_factor"] = round(t["gross_profit"] / t["gross_loss"], 2) if t["gross_loss"] > 0 else None
         for k in ("net", "floating", "gross_profit", "gross_loss"):
             t[k] = round(t[k], 2)
+        c = per_cur.get(t["currency"])
+        if c:
+            t["balance"] = round(c["balance"], 2)
+            t["equity"] = round(c["equity"], 2)
+            t["return_pct"] = _pct(t["net"], c["base"])
+            t["open_count"] = c["open_count"]
+            for k, since in recent_from.items():
+                t[k] = round(sum(p["net"] for p in c["all"] if p["close_time"] >= since), 2)
+            daily = _daily(c["period"])
+            t["daily"] = daily
+            cum = 0.0
+            t["curve"] = [[d + DAY, round(cum := cum + v, 2)] for d, v in daily]
+            t["max_drawdown"] = _max_drawdown([v for _, v in daily])
 
     return {"bots": bots, "accounts": accounts_out, "totals": sorted(totals.values(), key=lambda t: t["currency"])}
