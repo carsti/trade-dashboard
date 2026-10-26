@@ -81,6 +81,32 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(len(rep["bots"]), 2)
         self.assertEqual([t["currency"] for t in rep["totals"]], ["EUR", "USD"])
 
+    def test_account_filter_keeps_account_list(self):
+        a = [deal(1, 1, 1, 0, 42), deal(2, 1, 2, 1, 42, profit=10)]
+        b = [deal(1, 1, 1, 0, 7), deal(2, 1, 2, 1, 7, profit=-4)]
+        rep = analytics.build_report([snap(1, a), snap(2, b)], {}, None, None, accounts={"2"})
+        self.assertEqual([x["magics"] for x in rep["bots"]], [[7]])
+        self.assertEqual(rep["totals"][0]["net"], -4.0)
+        self.assertEqual([(x["key"], x["selected"]) for x in rep["accounts"]], [("1", False), ("2", True)])
+
+    def test_return_pct_recent_windows_and_daily(self):
+        day = analytics.DAY
+        now = 100 * day + 3600
+        deals = [deal(1, 1, 50 * day, 0, 5), deal(2, 1, 50 * day + 10, 1, 5, profit=100),       # vor 50 Tagen
+                 deal(3, 2, 95 * day, 0, 5), deal(4, 2, 95 * day + 10, 1, 5, profit=-20),        # vor 5 Tagen
+                 deal(5, 3, 100 * day, 0, 5), deal(6, 3, 100 * day + 60, 1, 5, profit=30)]       # heute
+        s = snap(1, deals)
+        s["account"].update(balance=1110.0, equity=1110.0)
+        rep = analytics.build_report([s], {}, 90 * day, None, now=now)
+        t = rep["totals"][0]
+        self.assertEqual((t["today"], t["d7"], t["d30"]), (30.0, 10.0, 10.0))
+        self.assertEqual(t["daily"], [[95 * day, -20.0], [100 * day, 30.0]])
+        self.assertEqual(t["curve"][-1][1], 10.0)
+        # Startkapital im Zeitraum = 1110 - 10 → 10 / 1100
+        self.assertEqual(t["return_pct"], round(100 * 10 / 1100, 2))
+        self.assertEqual(rep["bots"][0]["return_pct"], t["return_pct"])
+        self.assertEqual(rep["accounts"][0]["return_pct"], t["return_pct"])
+
 
 Info = namedtuple("Info", "login server name currency balance equity margin_level leverage")
 

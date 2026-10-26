@@ -16,7 +16,14 @@ ohne Python-Installation auf dem Zielrechner.
 - **Bot je Konto** oder **Bots kontoübergreifend** zusammengefasst (gleicher Name und gleiche Kontowährung).
 - Bots **umbenennen** (Name in der Tabelle anklicken). Standardname ist der Order-Kommentar des EAs plus Magic-Nummer.
 - Zeiträume: Heute, 7/30/90 Tage, laufendes Jahr, Gesamt, Von/Bis.
-- Diagramme: Netto pro Bot und kumulierter Verlauf ausgewählter Bots.
+- **Übersicht** (dunkles Design, Sidebar-Navigation; Hell/Dunkel umschaltbar): Netto je Währung mit Rendite in %
+  und Heute / 7 T / 30 T, Trefferquote und Profit-Faktor, Bots im Plus/Minus, kumulierter Verlauf oder
+  Tagesergebnis, Kalender mit Tages-P&L, Top & Flop nach Rendite. Ein Klick auf ein Konto filtert alles darauf.
+- **Bots**: eine Karte pro Bot mit Mini-Kurve, Rendite in % vom Konto, Trades, Treffer, PF, Max. DD und Hinweisen
+  (⚠ Risiko bei Grid/Martingale-Muster: hohe Trefferquote, aber Ø Verlust ≥ 3× Ø Gewinn; ◷ Inaktiv nach 7 Tagen
+  ohne Trade). Alternativ als Tabelle. Bot-Vergleich der kumulierten Kurven ausgewählter Bots.
+- Rendite in % bezieht sich auf das Startkapital des Zeitraums (Balance minus alles seit Zeitraumbeginn Realisierte);
+  Ein- und Auszahlungen im Zeitraum werden nicht herausgerechnet.
 - **CSV-Export** (Excel-tauglich, Dezimalkomma).
 - Automatische Aktualisierung (Standard alle 60 s).
 
