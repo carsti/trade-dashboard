@@ -9,17 +9,21 @@ import webbrowser
 
 from . import demo_source
 from .config import Config, config_dir
-from .server import APP_ID, AppState, serve
+from .server import APP_ID, VERSION, AppState, serve
 
 DEFAULT_PORT = 8765
 
 
-def _already_running(port: int) -> bool:
+def _running_instance(port: int) -> str | None:
+    """'same' = diese Version läuft schon, 'old' = andere Version des Dashboards, None = Port frei/fremd."""
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/ping", timeout=1) as r:
-            return r.read().decode() == APP_ID
+            reply = r.read().decode()
     except OSError:
-        return False
+        return None
+    if reply == f"{APP_ID} {VERSION}":
+        return "same"
+    return "old" if reply.startswith(APP_ID) else None
 
 
 def main(argv=None):
@@ -30,10 +34,23 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     url = f"http://127.0.0.1:{args.port}/"
-    if _already_running(args.port):
+    running = _running_instance(args.port)
+    if running == "same":
         print(f"Dashboard läuft bereits: {url}")
         webbrowser.open(url)
         return
+    while running == "old":
+        # Eine ältere Version (z. B. die alte .exe) belegt den Port. Statt sie wiederzuverwenden
+        # und die alte Oberfläche zu zeigen, auf den nächsten Port ausweichen.
+        print(f"Hinweis: Auf Port {args.port} läuft noch eine ältere Dashboard-Version. "
+              "Dort im Dashboard 'Beenden' klicken oder das alte Konsolenfenster schließen.")
+        args.port += 1
+        url = f"http://127.0.0.1:{args.port}/"
+        running = _running_instance(args.port)
+        if running == "same":
+            print(f"Dashboard läuft bereits: {url}")
+            webbrowser.open(url)
+            return
 
     if args.demo:
         cfg = Config(config_dir() / "demo-config.json")
