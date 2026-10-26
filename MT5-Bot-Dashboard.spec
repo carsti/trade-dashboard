@@ -1,8 +1,15 @@
 # PyInstaller-Spezifikation: eine einzelne .exe mit Konsole (zeigt Adresse & Status an)
+try:
+    from PyInstaller.utils.hooks import collect_all
+    _mt5_datas, _mt5_binaries, _mt5_hidden = collect_all("MetaTrader5")
+except Exception:
+    _mt5_datas, _mt5_binaries, _mt5_hidden = [], [], ["MetaTrader5"]
+
 a = Analysis(
     ["run.py"],
-    datas=[("mt5dash/static", "mt5dash/static")],
-    hiddenimports=["MetaTrader5"],
+    datas=[("mt5dash/static", "mt5dash/static")] + _mt5_datas,
+    binaries=_mt5_binaries,
+    hiddenimports=_mt5_hidden,
     excludes=["tkinter", "matplotlib", "pandas", "PIL", "IPython"],
 )
 pyz = PYZ(a.pure)
