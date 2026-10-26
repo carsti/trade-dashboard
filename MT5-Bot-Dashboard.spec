@@ -9,7 +9,7 @@ a = Analysis(
     ["run.py"],
     datas=[("mt5dash/static", "mt5dash/static")] + _mt5_datas,
     binaries=_mt5_binaries,
-    hiddenimports=_mt5_hidden,
+    hiddenimports=_mt5_hidden + ["numpy"],
     excludes=["tkinter", "matplotlib", "pandas", "PIL", "IPython"],
 )
 pyz = PYZ(a.pure)
