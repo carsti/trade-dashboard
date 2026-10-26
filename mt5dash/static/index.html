@@ -12,30 +12,78 @@
 </script>
 </head>
 <body>
-<div class="shell">
+<div class="shell" id="shell">
+  <!-- ================= Sidebar ================= -->
   <nav class="sidebar" aria-label="Navigation">
     <div class="brand">
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 17l5-5 4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>MT5 Bots</span>
+      <button class="burger" id="btnBurger" aria-label="Menü ein-/ausklappen"><i></i><i></i><i></i></button>
+      <span class="logo">MT5<b>Bots</b></span>
     </div>
-    <div class="nav" id="nav">
-      <button data-view="overview" class="on"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/></svg><span>Übersicht</span></button>
-      <button data-view="bots"><svg viewBox="0 0 24 24"><path d="M7 8h10a3 3 0 013 3v6a3 3 0 01-3 3H7a3 3 0 01-3-3v-6a3 3 0 013-3zM12 8V4M9 14h.01M15 14h.01"/></svg><span>Bots</span></button>
-      <button data-view="accounts"><svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM3 11h18M7 15h4"/></svg><span>Konten</span></button>
+
+    <div class="menu" id="menu">
+      <button class="item" data-view="dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>
+        <span>Dashboard</span>
+      </button>
+
+      <div class="group" data-group="bots">
+        <button class="item has-sub" data-view="bots">
+          <svg viewBox="0 0 24 24"><path d="M7 8h10a3 3 0 013 3v6a3 3 0 01-3 3H7a3 3 0 01-3-3v-6a3 3 0 013-3zM12 8V4M9 14h.01M15 14h.01"/></svg>
+          <span>Bots</span><em class="caret"></em>
+        </button>
+        <div class="sub">
+          <button data-view="bots" data-sub="cards">Karten</button>
+          <button data-view="bots" data-sub="table">Tabelle</button>
+          <button data-view="bots" data-sub="compare">Vergleich</button>
+        </div>
+      </div>
+
+      <div class="group" data-group="accounts">
+        <button class="item has-sub" data-view="accounts">
+          <svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM3 11h18M7 15h4"/></svg>
+          <span>Konten</span><em class="caret"></em>
+        </button>
+        <div class="sub" id="menuAccounts"></div>
+      </div>
+
+      <div class="group" data-group="analysis">
+        <button class="item has-sub" data-view="analysis">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          <span>Analyse</span><em class="caret"></em>
+        </button>
+        <div class="sub">
+          <button data-view="analysis" data-sub="symbols">Symbole</button>
+          <button data-view="analysis" data-sub="time">Wochentag &amp; Uhrzeit</button>
+          <button data-view="analysis" data-sub="calendar">Kalender</button>
+        </div>
+      </div>
+
+      <div class="group" data-group="settings">
+        <button class="item has-sub">
+          <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 003 15H3a2 2 0 110-4h.1a1.7 1.7 0 001.2-2.9l-.1-.1A2 2 0 117 5.2l.1.1A1.7 1.7 0 0010 4.1V4a2 2 0 114 0v.1a1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 001.2 2.9h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+          <span>Einstellungen</span><em class="caret"></em>
+        </button>
+        <div class="sub">
+          <button id="btnAccounts">Konten verwalten</button>
+          <button id="btnTheme">Hell / Dunkel</button>
+          <button id="btnQuit">Dashboard beenden</button>
+        </div>
+      </div>
     </div>
-    <div class="nav nav-bottom">
-      <button id="btnAccounts"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 003 15H3a2 2 0 110-4h.1a1.7 1.7 0 001.2-2.9l-.1-.1A2 2 0 117 5.2l.1.1A1.7 1.7 0 0010 4.1V4a2 2 0 114 0v.1a1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 001.2 2.9h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg><span>Konten verwalten</span></button>
-      <button id="btnTheme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg><span>Hell / Dunkel</span></button>
-      <button id="btnQuit"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1011.4 0"/></svg><span>Beenden</span></button>
+
+    <div class="side-foot">
+      <div class="side-h">Status</div>
+      <div id="sideStatus" class="side-status"></div>
     </div>
   </nav>
 
+  <!-- ================= Inhalt ================= -->
   <div class="content">
     <header class="topbar">
-      <div class="title">
-        <h1 id="viewTitle">Übersicht</h1>
+      <div class="crumb">
+        <h1 id="viewTitle">Dashboard</h1>
+        <span class="path">/ <span id="viewSub">Übersicht</span></span>
         <span id="demoBadge" class="badge" hidden>DEMO</span>
-        <div id="statusLine" class="status-line"></div>
       </div>
       <div class="toolbar">
         <div class="seg" id="periodSeg" role="group" aria-label="Zeitraum">
@@ -43,7 +91,7 @@
           <button data-p="7">7 T</button>
           <button data-p="30">30 T</button>
           <button data-p="90">90 T</button>
-          <button data-p="ytd">Lfd. Jahr</button>
+          <button data-p="ytd">Jahr</button>
           <button data-p="all" class="on">Gesamt</button>
           <button data-p="custom">Von/Bis</button>
         </div>
@@ -52,8 +100,9 @@
         </span>
         <div class="seg" id="groupSeg" role="group" aria-label="Gruppierung">
           <button data-g="account" class="on" title="Jeder Bot je Konto einzeln">Je Konto</button>
-          <button data-g="bot" title="Gleiche Bots über alle Konten zusammengefasst">Zusammengefasst</button>
+          <button data-g="bot" title="Gleiche Bots über alle Konten zusammengefasst">Zusammen</button>
         </div>
+        <div class="seg" id="curSeg" role="group" aria-label="Währung für Diagramme"></div>
         <button id="btnRefresh" class="btn icon" title="Jetzt aktualisieren" aria-label="Aktualisieren">⟳</button>
       </div>
     </header>
@@ -67,61 +116,62 @@
         <button class="btn primary" onclick="openAccounts(true)">Konto hinzufügen</button>
       </section>
 
-      <!-- Übersicht -->
-      <section class="view" data-view="overview">
-        <div id="kpis" class="kpis"></div>
-        <div class="grid-main">
-          <div class="card">
-            <div class="card-h">
+      <!-- ===== Dashboard ===== -->
+      <section class="view" data-view="dashboard">
+        <div class="row-top">
+          <div class="panel gauge-card" id="gWin"></div>
+          <div class="panel gauge-card" id="gBots"></div>
+          <div class="panel gauge-card" id="gDays"></div>
+          <div class="panel hero" id="hero"></div>
+          <div class="panel" id="accBars"></div>
+        </div>
+
+        <div class="row-mid">
+          <div class="panel">
+            <div class="ph">
               <h2>Verlauf</h2>
               <div class="tabs" id="chartTabs">
                 <button data-c="equity" class="on">Kumuliert</button>
-                <button data-c="daily">Tagesergebnis</button>
+                <button data-c="daily">Täglich</button>
               </div>
-              <span class="spacer"></span>
-              <div class="seg small" id="curSeg"></div>
             </div>
             <div id="mainChart" class="chart"></div>
           </div>
-          <div class="card">
-            <div class="card-h"><h2>Konten</h2><span class="muted small">Klicken filtert</span></div>
-            <div id="accList" class="acc-mini"></div>
+          <div class="panel">
+            <div class="ph"><h2>Bot-Ranking</h2><span class="muted small">Rendite in %</span></div>
+            <div id="ranking" class="ranking"></div>
+            <div class="small muted rank-note">Klick springt zum Bot</div>
           </div>
         </div>
-        <div class="grid-main">
-        <div class="card">
-          <div class="card-h">
-            <h2>Top &amp; Flop</h2>
-            <span class="muted small">Netto pro Bot im Zeitraum, inkl. Kommission &amp; Swap</span>
-            <span class="spacer"></span>
-            <button class="btn" data-goto="bots">Alle Bots →</button>
+
+        <div class="row-bottom">
+          <div class="panel">
+            <div class="ph"><h2>Aktivität</h2><span class="muted small">letzte Trades</span></div>
+            <div id="activity" class="activity"></div>
           </div>
-          <div id="rank" class="rank"></div>
-        </div>
-        <div class="card">
-          <div class="card-h">
-            <h2>Kalender</h2>
-            <span class="spacer"></span>
-            <button class="btn icon" id="calPrev" aria-label="Vormonat">‹</button>
-            <span id="calTitle" class="cal-title"></span>
-            <button class="btn icon" id="calNext" aria-label="Folgemonat">›</button>
+          <div class="panel">
+            <div class="ph cal-h">
+              <button class="arrow" data-cal="-1" aria-label="Vormonat">◀</button>
+              <h2 class="cal-title" data-cal-title></h2>
+              <button class="arrow" data-cal="1" aria-label="Folgemonat">▶</button>
+            </div>
+            <div class="cal" data-cal-grid></div>
           </div>
-          <div id="calendar" class="cal"></div>
-        </div>
+          <div class="panel">
+            <div class="ph"><h2>Top-Symbole</h2><span class="muted small">Trefferquote je Symbol</span></div>
+            <div id="symbolDonuts" class="donut-row"></div>
+          </div>
         </div>
       </section>
 
-      <!-- Bots -->
+      <!-- ===== Bots ===== -->
       <section class="view" data-view="bots" hidden>
-        <div class="card">
-          <div class="card-h">
-            <h2>Bot-Vergleich</h2>
-            <span class="muted small">„Vergleichen“ auf den Karten wählt die Bots (max. 8, gleiche Währung)</span>
-          </div>
+        <div class="panel" id="comparePanel">
+          <div class="ph"><h2>Bot-Vergleich</h2><span class="muted small">„Vergleichen“ wählt die Bots (max. 8, gleiche Währung)</span></div>
           <div id="lineLegend" class="legend"></div>
           <div id="lineChart" class="chart"></div>
         </div>
-        <div class="card-h bar">
+        <div class="bar">
           <div class="seg" id="botViewSeg">
             <button data-b="cards" class="on">Karten</button>
             <button data-b="table">Tabelle</button>
@@ -131,15 +181,41 @@
           <a id="btnCsv" class="btn" href="#">CSV-Export</a>
         </div>
         <div id="botCards" class="bot-cards"></div>
-        <div id="botTableWrap" class="card" hidden>
+        <div id="botTableWrap" class="panel" hidden>
           <div class="muted small" style="margin-bottom:6px">Namen anklicken zum Umbenennen</div>
           <div class="table-wrap"><table id="botTable"></table></div>
         </div>
       </section>
 
-      <!-- Konten -->
+      <!-- ===== Konten ===== -->
       <section class="view" data-view="accounts" hidden>
         <div id="accountCards" class="acc-cards"></div>
+      </section>
+
+      <!-- ===== Analyse ===== -->
+      <section class="view" data-view="analysis" hidden>
+        <div class="panel" id="anSymbols">
+          <div class="ph"><h2>Ergebnis je Symbol</h2><span class="muted small">geschlossene Trades im Zeitraum</span></div>
+          <div id="symbolBars"></div>
+        </div>
+        <div class="row-2" id="anTime">
+          <div class="panel">
+            <div class="ph"><h2>Wochentage</h2><span class="muted small">Netto nach Schließtag (Serverzeit)</span></div>
+            <div id="weekdayChart" class="chart"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h2>Uhrzeit</h2><span class="muted small">Netto nach Schließstunde (Serverzeit)</span></div>
+            <div id="hourChart" class="chart"></div>
+          </div>
+        </div>
+        <div class="panel" id="anCalendar">
+          <div class="ph cal-h">
+            <button class="arrow" data-cal="-1" aria-label="Vormonat">◀</button>
+            <h2 class="cal-title" data-cal-title></h2>
+            <button class="arrow" data-cal="1" aria-label="Folgemonat">▶</button>
+          </div>
+          <div class="cal big" data-cal-grid></div>
+        </div>
       </section>
     </main>
   </div>

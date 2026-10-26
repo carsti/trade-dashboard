@@ -17,6 +17,7 @@ from . import analytics, demo_source, mt5_source
 from .config import Config
 
 APP_ID = "mt5-bot-dashboard"
+VERSION = "2"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
 
 
 def static_dir() -> Path:
@@ -126,7 +127,7 @@ def make_handler(state: AppState, token: str):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             if u.path == "/ping":
-                return self._send(200, APP_ID.encode(), "text/plain")
+                return self._send(200, f"{APP_ID} {VERSION}".encode(), "text/plain")
             if u.path in ("/", "/index.html"):
                 html = (static_dir() / "index.html").read_text(encoding="utf-8").replace("__TOKEN__", token)
                 return self._send(200, html.encode(), "text/html; charset=utf-8")
