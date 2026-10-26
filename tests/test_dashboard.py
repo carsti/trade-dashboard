@@ -107,6 +107,19 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(rep["bots"][0]["return_pct"], t["return_pct"])
         self.assertEqual(rep["accounts"][0]["return_pct"], t["return_pct"])
 
+    def test_breakdowns_and_recent_trades(self):
+        day = analytics.DAY
+        # 5.1.1970 = Montag; Schließung 14:00 Uhr
+        deals = [deal(1, 1, 4 * day, 0, 5, comment="A"), deal(2, 1, 4 * day + 14 * 3600, 1, 5, profit=10),
+                 deal(3, 2, 5 * day, 0, 5), deal(4, 2, 5 * day + 3600, 1, 5, profit=-4)]
+        rep = analytics.build_report([snap(1, deals)], {}, None, None)
+        t = rep["totals"][0]
+        self.assertEqual(t["by_weekday"][0], [10.0, 1])   # Montag
+        self.assertEqual(t["by_weekday"][1], [-4.0, 1])   # Dienstag
+        self.assertEqual(t["by_hour"][14], [10.0, 1])
+        self.assertEqual(t["by_symbol"], [{"symbol": "EURUSD", "net": 6.0, "trades": 2, "win_rate": 50.0}])
+        self.assertEqual([(r["net"], r["bot"]) for r in rep["recent_trades"]], [(-4.0, "A (5)"), (10.0, "A (5)")])
+
 
 Info = namedtuple("Info", "login server name currency balance equity margin_level leverage")
 

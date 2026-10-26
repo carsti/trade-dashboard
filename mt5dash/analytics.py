@@ -19,6 +19,7 @@ DEAL_ENTRY_OUT_BY = 3
 
 MANUAL_NAME = "Manuell"
 DAY = 86400
+RECENT_TRADES = 15
 
 
 def deal_net(d: dict) -> float:
@@ -135,6 +136,27 @@ def _daily(closed: list[dict]) -> list[list]:
     return [[d, round(v, 2)] for d, v in sorted(days.items())]
 
 
+def _breakdowns(closed: list[dict]) -> dict:
+    """Netto und Trades je Symbol, Wochentag (0 = Montag) und Stunde der Schließzeit (Serverzeit)."""
+    sym: dict[str, list] = defaultdict(lambda: [0.0, 0, 0])
+    wd = [[0.0, 0] for _ in range(7)]
+    hr = [[0.0, 0] for _ in range(24)]
+    for p in closed:
+        s = sym[p["symbol"] or "?"]
+        s[0] += p["net"]; s[1] += 1; s[2] += p["net"] > 0
+        d = (p["close_time"] // DAY + 3) % 7  # 1.1.1970 war ein Donnerstag
+        wd[d][0] += p["net"]; wd[d][1] += 1
+        h = p["close_time"] % DAY // 3600
+        hr[h][0] += p["net"]; hr[h][1] += 1
+    return {
+        "by_symbol": sorted(({"symbol": k, "net": round(v[0], 2), "trades": v[1],
+                              "win_rate": round(100 * v[2] / v[1], 1)} for k, v in sym.items()),
+                            key=lambda x: x["net"], reverse=True),
+        "by_weekday": [[round(n, 2), c] for n, c in wd],
+        "by_hour": [[round(n, 2), c] for n, c in hr],
+    }
+
+
 def _pct(net: float, base: float) -> float | None:
     return round(100 * net / base, 2) if base > 0 else None
 
@@ -160,6 +182,7 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
     entries: dict[tuple, dict] = {}
     accounts_out = []
     per_cur: dict[str, dict] = {}   # Währung → Konto-Summen, Startkapital, alle/realisierte Positionen
+    recent: list[dict] = []
 
     for snap in snapshots:
         acc = snap["account"]
@@ -217,6 +240,12 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
             c["base"] += start_balance or 0.0
             c["all"] += closed_all
             c["period"] += in_period
+            for p in sorted(in_period, key=lambda p: p["close_time"])[-RECENT_TRADES:]:
+                recent.append({
+                    "time": p["close_time"], "account": acc["label"], "currency": currency,
+                    "bot": resolve_bot_name(key, p["magic"], names, comments_by_magic[p["magic"]]),
+                    "symbol": p["symbol"], "direction": p["direction"], "volume": p["volume"], "net": p["net"],
+                })
             c["open_count"] += len(snap.get("open_positions", []))
 
         accounts_out.append({
@@ -276,5 +305,8 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
             cum = 0.0
             t["curve"] = [[d + DAY, round(cum := cum + v, 2)] for d, v in daily]
             t["max_drawdown"] = _max_drawdown([v for _, v in daily])
+            t.update(_breakdowns(c["period"]))
 
-    return {"bots": bots, "accounts": accounts_out, "totals": sorted(totals.values(), key=lambda t: t["currency"])}
+    recent.sort(key=lambda r: r["time"], reverse=True)
+    return {"bots": bots, "accounts": accounts_out, "totals": sorted(totals.values(), key=lambda t: t["currency"]),
+            "recent_trades": recent[:RECENT_TRADES]}
