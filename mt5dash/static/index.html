@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MT5 Bot Dashboard</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+<script>window.API_TOKEN = "__TOKEN__";</script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 17l5-5 4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>MT5 Bot Dashboard</span>
+    <span id="demoBadge" class="badge" hidden>DEMO</span>
+  </div>
+  <div class="toolbar">
+    <div class="seg" id="periodSeg" role="group" aria-label="Zeitraum">
+      <button data-p="today">Heute</button>
+      <button data-p="7">7 T</button>
+      <button data-p="30">30 T</button>
+      <button data-p="90">90 T</button>
+      <button data-p="ytd">Lfd. Jahr</button>
+      <button data-p="all" class="on">Gesamt</button>
+      <button data-p="custom">Von/Bis</button>
+    </div>
+    <span id="customRange" hidden>
+      <input type="date" id="dFrom" aria-label="Von"> – <input type="date" id="dTo" aria-label="Bis">
+    </span>
+    <div class="seg" id="groupSeg" role="group" aria-label="Gruppierung">
+      <button data-g="account" class="on">Bot je Konto</button>
+      <button data-g="bot">Bots kontoübergreifend</button>
+    </div>
+    <button id="btnRefresh" class="btn" title="Jetzt aktualisieren">⟳ Aktualisieren</button>
+    <button id="btnAccounts" class="btn primary">Konten</button>
+    <button id="btnQuit" class="btn ghost" title="Dashboard beenden">Beenden</button>
+  </div>
+</header>
+
+<main>
+  <div id="statusLine" class="status-line"></div>
+
+  <section id="emptyState" class="empty" hidden>
+    <h2>Noch keine Konten verbunden</h2>
+    <p>Füge dein erstes MetaTrader 5-Konto hinzu. Das MT5-Terminal muss auf diesem PC installiert sein.</p>
+    <button class="btn primary" onclick="openAccounts(true)">Konto hinzufügen</button>
+  </section>
+
+  <section id="kpis" class="kpis"></section>
+
+  <section class="grid2">
+    <div class="card">
+      <div class="card-h"><h2>Netto-Ergebnis pro Bot</h2><span class="muted small">geschlossene Trades im Zeitraum, inkl. Kommission &amp; Swap</span></div>
+      <div id="barChart" class="chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Kumulierter Verlauf</h2><span class="muted small">Häkchen in der Tabelle wählt die Bots (max. 8)</span></div>
+      <div id="lineLegend" class="legend"></div>
+      <div id="lineChart" class="chart"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-h">
+      <h2>Bots</h2>
+      <span class="muted small">Namen anklicken zum Umbenennen</span>
+      <span class="spacer"></span>
+      <input id="search" type="search" placeholder="Filtern…" aria-label="Bots filtern">
+      <a id="btnCsv" class="btn" href="#">CSV-Export</a>
+    </div>
+    <div class="table-wrap"><table id="botTable"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><h2>Konten</h2></div>
+    <div id="accountCards" class="acc-cards"></div>
+  </section>
+</main>
+
+<div id="tooltip" class="tooltip" hidden></div>
+
+<dialog id="accDialog">
+  <div class="dlg-h"><h2>Konten verwalten</h2><button class="x" onclick="accDialog.close()" aria-label="Schließen">×</button></div>
+  <div id="accList" class="acc-list"></div>
+  <form id="accForm" autocomplete="off">
+    <h3 id="accFormTitle">Konto hinzufügen</h3>
+    <input type="hidden" name="id">
+    <div class="form-grid">
+      <label>Anzeigename<input name="label" placeholder="z. B. IC Markets Live"></label>
+      <label>Login (Kontonummer)<input name="login" required inputmode="numeric" pattern="[0-9]+"></label>
+      <label>Server<input name="server" required placeholder="z. B. ICMarketsSC-Live07"></label>
+      <label>Passwort <span class="muted small">(Investor-Passwort reicht)</span><input name="password" type="password" placeholder="leer = unverändert / im Terminal gespeichert"></label>
+      <label class="wide">Pfad zum MT5-Terminal <span class="muted small">(optional, z. B. C:\Program Files\MetaTrader 5 IC Markets\terminal64.exe)</span><input name="terminal_path"></label>
+      <label class="check wide"><input type="checkbox" name="allow_switch"> <span>Login-Wechsel erlauben – nur aktivieren, wenn in diesem Terminal <b>keine Bots laufen</b>, sonst würden sie auf dem anderen Konto weiterhandeln.</span></label>
+      <label class="check"><input type="checkbox" name="enabled" checked> Aktiv</label>
+    </div>
+    <div class="form-actions">
+      <span id="accMsg" class="small"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" onclick="resetAccForm()">Neu</button>
+      <button type="submit" class="btn primary">Speichern &amp; verbinden</button>
+    </div>
+  </form>
+  <details class="settings">
+    <summary>Einstellungen</summary>
+    <form id="setForm" class="form-grid">
+      <label>Aktualisieren alle (Sekunden)<input name="refresh_seconds" type="number" min="10"></label>
+      <label>History zurück (Tage)<input name="history_days" type="number" min="1"></label>
+      <label class="wide">Standard-Terminalpfad (für Konten ohne eigenen Pfad)<input name="default_terminal_path"></label>
+      <div class="form-actions wide"><span class="spacer"></span><button class="btn">Einstellungen speichern</button></div>
+    </form>
+  </details>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
