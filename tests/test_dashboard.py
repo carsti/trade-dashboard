@@ -120,6 +120,58 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(t["by_symbol"], [{"symbol": "EURUSD", "net": 6.0, "trades": 2, "win_rate": 50.0}])
         self.assertEqual([(r["net"], r["bot"]) for r in rep["recent_trades"]], [(-4.0, "A (5)"), (10.0, "A (5)")])
 
+    def test_return_pct_ignores_withdrawn_profits(self):
+        # 500 eingezahlt, 980 Gewinn, 1000 ausgezahlt → Balance 480. Früher: Basis 480 − 980 < 0 → keine Rendite
+        # bzw. negative Basis in der Währungssumme (absurde Prozentwerte).
+        deals = [deal(1, 0, 10, 0, 0, profit=500, typ=2),
+                 deal(2, 1, 20, 0, 5), deal(3, 1, 30, 1, 5, profit=980),
+                 deal(4, 0, 40, 0, 0, profit=-1000, typ=2)]
+        s = snap(1, deals)
+        s["account"].update(balance=480.0, equity=480.0)
+        other = snap(2, [deal(1, 0, 10, 0, 0, profit=1000, typ=2), deal(2, 1, 20, 0, 6), deal(3, 1, 30, 1, 6, profit=100)])
+        other["account"].update(balance=1100.0, equity=1100.0)
+        rep = analytics.build_report([s, other], {}, None, None)
+        self.assertEqual(rep["accounts"][0]["return_pct"], round(100 * 980 / 500, 2))
+        self.assertEqual(rep["totals"][0]["return_pct"], round(100 * 1080 / 1500, 2))
+
+    def test_return_pct_counts_deposits_in_period(self):
+        deals = [deal(1, 0, 10, 0, 0, profit=1000, typ=2),
+                 deal(2, 1, 20, 0, 5), deal(3, 1, 30, 1, 5, profit=100),
+                 deal(4, 0, 40, 0, 0, profit=1000, typ=2),
+                 deal(5, 2, 50, 0, 5), deal(6, 2, 60, 1, 5, profit=50)]
+        s = snap(1, deals)
+        s["account"].update(balance=2150.0, equity=2150.0)
+        rep = analytics.build_report([s], {}, 25, None)
+        # Balance zu Beginn 1000 (bei t=25) + Einzahlung 1000 → Basis 2000
+        self.assertEqual(rep["accounts"][0]["return_pct"], round(100 * 150 / 2000, 2))
+
+    def test_capital_base_without_positive_base(self):
+        self.assertIsNone(analytics.capital_base([], 0.0, None))
+
+
+class ModeTest(unittest.TestCase):
+    def test_switch_between_demo_and_live(self):
+        from mt5dash import server
+        made = []
+
+        def factory(demo):
+            made.append(demo)
+            cfg = server.Config.__new__(server.Config)
+            cfg.data = {"accounts": [{"id": "x"}] if demo else []}
+            return cfg
+
+        st = server.AppState(factory(False), demo=False, config_factory=factory)
+        st.snapshots = {"a": {}}
+        st.set_mode(True)
+        self.assertTrue(st.demo)
+        self.assertEqual(st.snapshots, {})
+        self.assertEqual(st.cfg.accounts(), [{"id": "x"}])
+        st.set_mode(True)  # unverändert → keine neue Konfiguration
+        self.assertEqual(made, [False, True])
+        st.set_mode(False)
+        self.assertFalse(st.demo)
+
+
 
 Info = namedtuple("Info", "login server name currency balance equity margin_level leverage")
 

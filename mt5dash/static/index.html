@@ -65,6 +65,10 @@
         </button>
         <div class="sub">
           <button id="btnAccounts">Konten verwalten</button>
+          <div id="modeSeg" class="mode" role="group" aria-label="Datenquelle">
+            <button data-mode="live" title="Deine MT5-Konten">Live</button>
+            <button data-mode="demo" title="Beispieldaten ohne MT5">Demo</button>
+          </div>
           <button id="btnTheme">Hell / Dunkel</button>
           <button id="btnQuit">Dashboard beenden</button>
         </div>
@@ -83,8 +87,12 @@
       <div class="crumb">
         <h1 id="viewTitle">Dashboard</h1>
         <span class="path">/ <span id="viewSub">Übersicht</span></span>
-        <span id="demoBadge" class="badge" hidden>DEMO</span>
+        <button id="demoBadge" class="badge" title="Demo-Daten – Klick wechselt zu deinen echten Konten" hidden>DEMO</button>
       </div>
+      <form id="topSearchForm" class="search" role="search">
+        <input id="topSearch" type="search" placeholder="Bot, Symbol, Magic suchen…" aria-label="Bots suchen">
+        <button type="submit" aria-label="Suchen"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
+      </form>
       <div class="toolbar">
         <div class="seg" id="periodSeg" role="group" aria-label="Zeitraum">
           <button data-p="today">Heute</button>
@@ -114,6 +122,7 @@
         <h2>Noch keine Konten verbunden</h2>
         <p>Füge dein erstes MetaTrader 5-Konto hinzu. Das MT5-Terminal muss auf diesem PC installiert sein.</p>
         <button class="btn primary" onclick="openAccounts(true)">Konto hinzufügen</button>
+        <button class="btn" onclick="setMode(true)">Mit Demo-Daten ausprobieren</button>
       </section>
 
       <!-- ===== Dashboard ===== -->
@@ -140,7 +149,7 @@
           <div class="panel">
             <div class="ph"><h2>Bot-Ranking</h2><span class="muted small">Rendite in %</span></div>
             <div id="ranking" class="ranking"></div>
-            <div class="small muted rank-note">Klick springt zum Bot</div>
+            <div class="small muted rank-note">Klick öffnet die Bot-Karte</div>
           </div>
         </div>
 
@@ -248,10 +257,10 @@
   <details class="settings">
     <summary>Einstellungen</summary>
     <form id="setForm" class="form-grid">
-      <label>Aktualisieren alle (Sekunden)<input name="refresh_seconds" type="number" min="10"></label>
-      <label>History zurück (Tage)<input name="history_days" type="number" min="1"></label>
+      <label>Aktualisieren alle (Sekunden)<input name="refresh_seconds" type="number" min="10" required></label>
+      <label>History zurück (Tage)<input name="history_days" type="number" min="1" required></label>
       <label class="wide">Standard-Terminalpfad (für Konten ohne eigenen Pfad)<input name="default_terminal_path"></label>
-      <div class="form-actions wide"><span class="spacer"></span><button class="btn">Einstellungen speichern</button></div>
+      <div class="form-actions wide"><span id="setMsg" class="small"></span><span class="spacer"></span><button class="btn">Einstellungen speichern</button></div>
     </form>
   </details>
 </dialog>
