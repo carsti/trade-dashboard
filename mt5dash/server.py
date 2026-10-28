@@ -1,10 +1,11 @@
-"""Lokaler HTTP-Server (nur 127.0.0.1) mit JSON-API und der Dashboard-Oberfläche."""
+"""HTTP-Server (lokal und im Heimnetz erreichbar) mit JSON-API und der Dashboard-Oberfläche."""
 from __future__ import annotations
 
 import csv
 import io
 import json
 import secrets
+import socket
 import sys
 import threading
 import time
@@ -17,7 +18,8 @@ from . import analytics, demo_source, mt5_source
 from .config import Config, config_dir
 
 APP_ID = "mt5-bot-dashboard"
-VERSION = "3"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
+DISCOVERY_PORT = 8764  # UDP: andere Geräte finden darüber das Dashboard im Netzwerk
+VERSION = "4"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
 
 
 def static_dir() -> Path:
@@ -123,6 +125,10 @@ def _int_or_none(v):
         return None
 
 
+# POST-Aufrufe, die auch andere Geräte im Netz ausführen dürfen (nur Anzeige, keine Konten/Pfade/Beenden).
+REMOTE_POST_PATHS = {"/api/refresh", "/api/mode", "/api/bot-name"}
+
+
 def make_handler(state: AppState, token: str):
     class Handler(BaseHTTPRequestHandler):
         server_version = "MT5Dash"
@@ -147,6 +153,9 @@ def make_handler(state: AppState, token: str):
         def _body(self):
             n = int(self.headers.get("Content-Length") or 0)
             return json.loads(self.rfile.read(n) or b"{}")
+
+        def _is_local(self):
+            return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
         def _authorized(self, q):
             return secrets.compare_digest(self.headers.get("X-Token") or q.get("token", [""])[0], token)
@@ -182,6 +191,7 @@ def make_handler(state: AppState, token: str):
                     "bot_names": state.cfg.data["bot_names"],
                     "refreshing": state.refreshing,
                     "last_refresh": state.last_refresh,
+                    "remote": not self._is_local(),
                 })
             if u.path in ("/api/report", "/api/export.csv"):
                 t_from = _int_or_none(q.get("from", [None])[0])
@@ -199,6 +209,9 @@ def make_handler(state: AppState, token: str):
             u = urlparse(self.path)
             if not self._authorized(parse_qs(u.query)):
                 return self._json({"error": "unauthorized"}, 403)
+            if not self._is_local() and u.path not in REMOTE_POST_PATHS:
+                # Konten, Terminalpfade und Beenden nur am PC selbst, nicht von anderen Geräten im Netz.
+                return self._json({"error": "Nur am PC mit dem Dashboard möglich, nicht von anderen Geräten aus."}, 403)
             try:
                 body = self._body()
                 if u.path == "/api/accounts":
@@ -257,7 +270,69 @@ def _csv(rep: dict) -> str:
     return buf.getvalue()
 
 
-def serve(state: AppState, port: int) -> tuple[ThreadingHTTPServer, str]:
+def serve(state: AppState, port: int, host: str = "0.0.0.0") -> tuple[ThreadingHTTPServer, str]:
     token = secrets.token_urlsafe(24)
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state, token))
+    httpd = ThreadingHTTPServer((host, port), make_handler(state, token))
     return httpd, token
+
+
+def lan_ip() -> str | None:
+    """IP-Adresse dieses PCs im Heimnetz (z. B. 192.168.1.20), oder None ohne Netzwerk."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))  # UDP: es wird nichts gesendet, nur die Route bestimmt
+            ip = s.getsockname()[0]
+    except OSError:
+        return None
+    return None if ip.startswith("127.") else ip
+
+
+def answer_discovery(state: "AppState", port: int):
+    """Beantwortet Suchanfragen anderer Geräte ("Wo läuft das Dashboard?") mit dem eigenen HTTP-Port."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("0.0.0.0", DISCOVERY_PORT))
+    except OSError:
+        return  # Port belegt (z. B. zweite Instanz): dann antwortet eben die andere
+    sock.settimeout(1)
+    with sock:
+        while not state.stop.is_set():
+            try:
+                data, addr = sock.recvfrom(256)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            if data == f"{APP_ID}?".encode() and state.cfg.accounts():  # nur ein Dashboard mit Konten meldet sich
+                sock.sendto(f"{APP_ID} {VERSION} {port} {socket.gethostname()}".encode(), addr)
+
+
+def find_dashboard(timeout: float = 1.5) -> tuple[str, str] | None:
+    """Sucht per Broadcast ein Dashboard mit Konten im Netzwerk. Liefert (URL, PC-Name) oder None."""
+    targets = ["255.255.255.255"]
+    ip = lan_ip()
+    if ip:
+        targets.append(ip.rsplit(".", 1)[0] + ".255")  # Heimnetze sind fast immer /24
+    own = {ip, "127.0.0.1"}
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.settimeout(0.3)
+            end = time.time() + timeout
+            for t in targets:
+                try:
+                    sock.sendto(f"{APP_ID}?".encode(), (t, DISCOVERY_PORT))
+                except OSError:
+                    pass
+            while time.time() < end:
+                try:
+                    data, addr = sock.recvfrom(256)
+                except socket.timeout:
+                    continue
+                parts = data.decode(errors="replace").split(" ", 3)
+                if len(parts) == 4 and parts[0] == APP_ID and addr[0] not in own:
+                    return f"http://{addr[0]}:{parts[2]}/", parts[3]
+    except OSError:
+        return None
+    return None
