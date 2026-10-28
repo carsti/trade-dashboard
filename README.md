@@ -37,10 +37,22 @@ ohne Python-Installation auf dem Zielrechner.
 
 1. Auf dem PC muss das **MetaTrader 5-Terminal installiert** sein. Die MT5-Python-Schnittstelle spricht immer mit
    einem lokalen Terminal.
-2. `MT5-Bot-Dashboard.exe` starten. Der Browser öffnet sich mit `http://127.0.0.1:8765/`
-   (nur lokal erreichbar). Das Konsolenfenster zeigt den Status. Zum Beenden das Fenster schließen oder im Dashboard
+2. `MT5-Bot-Dashboard.exe` starten. Der Browser öffnet sich mit `http://127.0.0.1:8765/`.
+   Das Konsolenfenster zeigt den Status und die Adresse im Netzwerk. Zum Beenden das Fenster schließen oder im Dashboard
    „Beenden“ klicken.
 3. **Konten** → Konto hinzufügen → „Speichern & verbinden“.
+
+### Von anderen Geräten aus (Handy, Tablet, zweiter PC)
+
+Die exe läuft nur auf dem PC mit den MT5-Terminals. Andere Geräte im selben Netzwerk öffnen einfach im Browser die
+Adresse, die das Konsolenfenster unter „Im Netzwerk“ anzeigt, z. B. `http://192.168.1.20:8765/`. Auf den anderen
+Geräten muss nichts installiert werden.
+
+- Beim ersten Start fragt die Windows-Firewall nach: **„Private Netzwerke“ zulassen**. Wurde das abgelehnt, unter
+  *Windows-Sicherheit → Firewall → Zugriff von Apps durch die Firewall zulassen* nachholen.
+- Von anderen Geräten aus kann man alles ansehen, aktualisieren und Bots umbenennen. Konten, Terminalpfade,
+  Einstellungen und „Beenden“ gehen nur am PC selbst.
+- Wer das Dashboard nur lokal haben will: mit `--local` starten.
 
 Ausprobieren ohne MT5: `MT5-Bot-Dashboard.exe --demo` startet mit Beispieldaten.
 
@@ -90,6 +102,6 @@ Tests: `python -m unittest discover -s tests -t .`
 | `mt5dash/mt5_source.py` | Liest Konto, Deal-History und Positionen über das `MetaTrader5`-Paket |
 | `mt5dash/analytics.py` | Fasst Deals zu Positionen zusammen und berechnet die Kennzahlen pro Bot |
 | `mt5dash/config.py` | Konten, Bot-Namen, Einstellungen, DPAPI-Verschlüsselung |
-| `mt5dash/server.py` | Lokaler HTTP-Server (nur 127.0.0.1, mit Zugriffstoken) und JSON-API |
+| `mt5dash/server.py` | HTTP-Server (lokal und im Heimnetz, mit Zugriffstoken; Änderungen an Konten nur lokal) und JSON-API |
 | `mt5dash/static/` | Oberfläche (HTML/CSS/JS, keine externen Abhängigkeiten, läuft offline) |
 | `mt5dash/demo_source.py` | Beispieldaten für `--demo` |

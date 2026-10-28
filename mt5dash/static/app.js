@@ -99,6 +99,7 @@ async function load() {
     const [state, report] = await Promise.all([api("/api/state"), api("/api/report?" + query())]);
     if (seq !== loadSeq) return;
     S.state = state; S.report = report;
+    $("#btnQuit").hidden = state.remote;  // von anderen Geräten aus nicht den Server auf dem PC beenden
     // Filter auf inzwischen entfernte Konten verwerfen, sonst bliebe alles leer
     const keys = new Set(report.accounts.map((a) => a.key));
     if ([...S.accFilter].some((k) => !keys.has(k))) {
