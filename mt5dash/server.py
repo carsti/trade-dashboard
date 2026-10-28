@@ -14,10 +14,10 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import analytics, demo_source, mt5_source
-from .config import Config
+from .config import Config, config_dir
 
 APP_ID = "mt5-bot-dashboard"
-VERSION = "2"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
+VERSION = "3"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
 
 
 def static_dir() -> Path:
@@ -25,10 +25,25 @@ def static_dir() -> Path:
     return base / "mt5dash" / "static"
 
 
+def make_config(demo: bool) -> Config:
+    """Echte Konfiguration oder eine eigene Demo-Konfiguration mit den Beispielkonten."""
+    if not demo:
+        return Config()
+    cfg = Config(config_dir() / "demo-config.json")
+    if not cfg.accounts():
+        for a in demo_source.DEMO_ACCOUNTS:
+            cfg.data["accounts"].append({"id": a["id"], "label": a["label"], "login": a["login"],
+                                         "server": a["server"], "password": "", "terminal_path": "",
+                                         "enabled": True, "allow_switch": False})
+        cfg.save()
+    return cfg
+
+
 class AppState:
-    def __init__(self, cfg: Config, demo: bool):
+    def __init__(self, cfg: Config, demo: bool, config_factory=make_config):
         self.cfg = cfg
         self.demo = demo
+        self._config_factory = config_factory
         self.snapshots: dict[str, dict] = {}
         self.lock = threading.Lock()
         self.refreshing = False
@@ -44,6 +59,7 @@ class AppState:
                                         self.cfg.data.get("default_terminal_path", ""))
 
     def refresh_account(self, acc: dict):
+        cfg = self.cfg
         base = {"key": str(acc["login"]), "label": acc["label"], "login": acc["login"], "server": acc["server"]}
         try:
             snap = self._fetch(acc)
@@ -54,14 +70,16 @@ class AppState:
             snap = {**snap, "account": {**snap["account"], **base, "status": "error", "error": str(e),
                                         "updated": snap["account"].get("updated")}}
         with self.lock:
-            self.snapshots[acc["id"]] = snap
+            if cfg is self.cfg:  # nach einem Moduswechsel keine Daten des alten Modus mehr eintragen
+                self.snapshots[acc["id"]] = snap
         return snap["account"]
 
     def refresh_all(self):
         self.refreshing = True
+        cfg = self.cfg
         try:
-            for acc in list(self.cfg.accounts()):
-                if acc.get("enabled", True):
+            for acc in list(cfg.accounts()):
+                if acc.get("enabled", True) and cfg is self.cfg:
                     self.refresh_account(acc)
             ids = {a["id"] for a in self.cfg.accounts() if a.get("enabled", True)}
             with self.lock:
@@ -74,6 +92,17 @@ class AppState:
 
     def trigger_refresh(self):
         self._wake.set()
+
+    def set_mode(self, demo: bool):
+        """Zwischen Demo-Daten und echten Konten umschalten (ohne Neustart)."""
+        if demo == self.demo:
+            return
+        cfg = self._config_factory(demo)
+        with self.lock:
+            self.cfg, self.demo = cfg, demo
+            self.snapshots = {}
+            self.last_refresh = None
+        self.trigger_refresh()
 
     def loop(self):
         while not self.stop.is_set():
@@ -188,6 +217,9 @@ def make_handler(state: AppState, token: str):
                     state.cfg.set_settings(body)
                     state.trigger_refresh()
                     return self._json({"ok": True})
+                if u.path == "/api/mode":
+                    state.set_mode(bool(body.get("demo")))
+                    return self._json({"ok": True, "demo": state.demo})
                 if u.path == "/api/refresh":
                     state.trigger_refresh()
                     return self._json({"ok": True})

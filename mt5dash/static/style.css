@@ -1,4 +1,4 @@
-/* Violett/Neon-Design. Dunkel ist Standard, Hell per Einstellungen → Hell / Dunkel */
+/* Buntes Violett/Neon-Design. Dunkel ist Standard, Hell per Einstellungen → Hell / Dunkel */
 :root {
   color-scheme: light;
   --bg: #f1eef9;
@@ -28,19 +28,19 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0d0716;
-  --sidebar: #120a20;
-  --surface-1: #1a1030;
-  --surface-2: #241640;
-  --border: #2f1f52;
-  --text-primary: #f1ecff;
-  --text-secondary: #c4b8e6;
-  --text-muted: #8f82b5;
-  --grid: #2a1c4a;
+  --bg: #1a0933;
+  --sidebar: #0f0722;
+  --surface-1: #140a29;
+  --surface-2: #231541;
+  --border: #33215c;
+  --text-primary: #f4efff;
+  --text-secondary: #cbbfee;
+  --text-muted: #9486bd;
+  --grid: #2b1c4d;
   --neon-1: #22d3ee;
   --neon-2: #e879f9;
-  --neon-3: #f472b6;
-  --neon-4: #a78bfa;
+  --neon-3: #fb7185;
+  --neon-4: #a855f7;
   --accent: var(--neon-2);
   --on-accent: #1a0624;
   --good-text: #4cc94c;
@@ -52,14 +52,22 @@
 }
 
 * { box-sizing: border-box; }
+/* "hidden" muss immer gewinnen – sonst bleiben z. B. Filterleiste oder Bot-Karten trotz hidden sichtbar */
+[hidden] { display: none !important; }
 body {
   margin: 0; color: var(--text-primary); background: var(--bg);
   font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 }
 :root[data-theme="dark"] body {
-  background: radial-gradient(1200px 600px at 70% -10%, #2a0f45 0%, transparent 60%), var(--bg);
+  /* violetter Verlauf wie in der Vorlage: dunkel links oben, Magenta-Schimmer rechts unten */
+  background:
+    radial-gradient(900px 600px at 85% 110%, #5b1170 0%, transparent 60%),
+    radial-gradient(1100px 600px at 60% -15%, #3b1470 0%, transparent 60%),
+    linear-gradient(135deg, #12062a 0%, #1f0a3d 55%, #2c0c4c 100%);
   background-attachment: fixed;
 }
+:root[data-theme="dark"] .sidebar { background: linear-gradient(180deg, #120827, #0c061c); }
+:root[data-theme="dark"] .panel { box-shadow: 0 10px 30px rgba(5, 0, 15, .35), inset 0 1px 0 rgba(255, 255, 255, .03); }
 .muted { color: var(--text-muted); }
 .small { font-size: 12px; }
 .spacer { flex: 1; }
@@ -74,7 +82,7 @@ body {
   background: var(--sidebar); border-right: 1px solid var(--border); padding: 14px 10px; overflow-y: auto;
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }
-.logo { font-size: 19px; font-weight: 800; letter-spacing: .5px; color: var(--neon-1); }
+.logo { font-size: 20px; font-weight: 800; letter-spacing: .5px; color: var(--neon-1); text-shadow: 0 0 14px color-mix(in srgb, var(--neon-1) 45%, transparent); }
 .logo b { color: var(--neon-2); font-weight: 800; }
 .burger { display: inline-flex; flex-direction: column; gap: 3px; border: 0; background: none; padding: 4px; cursor: pointer; }
 .burger i { display: block; width: 18px; height: 2px; border-radius: 2px; background: var(--text-secondary); }
@@ -98,12 +106,20 @@ body {
 }
 .sub button:hover { color: var(--text-primary); background: var(--surface-2); }
 .sub button.on { color: var(--neon-1); }
+.mode { display: flex; gap: 2px; margin: 4px 8px; padding: 2px; border: 1px solid var(--border); border-radius: 99px; }
+.mode button { flex: 1; justify-content: center; border-radius: 99px; padding: 4px 8px; font-size: 12px; }
+.mode button.on { background: linear-gradient(90deg, var(--neon-4), var(--neon-2)); color: var(--on-accent); font-weight: 700; }
 .side-foot { margin-top: auto; padding: 14px 10px 4px; border-top: 1px solid var(--border); }
 .side-h { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--text-primary); margin-bottom: 6px; }
 .side-status { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
 .side-status .err { color: var(--bad-text); }
 .shell.collapsed .sidebar { flex-basis: 64px; }
 .shell.collapsed .logo, .shell.collapsed .item span, .shell.collapsed .caret, .shell.collapsed .sub, .shell.collapsed .side-foot { display: none; }
+/* eingeklappt: Untermenüs als Flyout neben dem Symbol, damit alle Punkte erreichbar bleiben */
+.shell.collapsed .group.open .sub {
+  display: flex; position: fixed; left: 60px; z-index: 30; min-width: 200px; padding: 8px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.45);
+}
 .shell.collapsed .item { justify-content: center; padding: 10px; }
 .shell.collapsed .brand { justify-content: center; padding: 4px 0 20px; }
 
@@ -118,7 +134,16 @@ body {
 .crumb { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .crumb h1 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
 .crumb .path { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-.badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--warn); color: #3a2a00; align-self: center; }
+.badge { font: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px; border: 0; border-radius: 99px; background: var(--warn); color: #3a2a00; align-self: center; cursor: pointer; }
+.badge[hidden] { display: none; }
+.search { display: flex; align-items: center; flex: 1 1 220px; max-width: 420px; background: color-mix(in srgb, var(--neon-4) 16%, var(--surface-1)); border: 1px solid var(--border); border-radius: 99px; padding: 2px 2px 2px 14px; }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 5px 4px; font-size: 13px; }
+.search input:focus-visible { outline: none; }
+.search:focus-within { border-color: var(--neon-2); }
+.search button { display: grid; place-items: center; width: 30px; height: 28px; border: 0; border-radius: 99px; background: linear-gradient(90deg, var(--neon-4), var(--neon-2)); cursor: pointer; }
+.search svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; }
+.btn.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
 .seg { display: inline-flex; max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 99px; background: var(--surface-1); padding: 2px; gap: 2px; }
 .seg:empty { display: none; }
@@ -146,7 +171,8 @@ input:focus-visible, button:focus-visible, .btn:focus-visible { outline: 2px sol
 .chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
 
 /* ================= Raster & Panels ================= */
-main { padding: 18px 24px 40px; max-width: 1680px; width: 100%; display: flex; flex-direction: column; gap: 16px; }
+main { padding: 18px 24px 40px; width: 100%; display: flex; flex-direction: column; gap: 16px; }
+main.no-accounts .view { display: none; }
 .view { display: flex; flex-direction: column; gap: 16px; }
 .view[hidden] { display: none; }
 .panel {
@@ -155,6 +181,7 @@ main { padding: 18px 24px 40px; max-width: 1680px; width: 100%; display: flex; f
 }
 .ph { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 12px; }
 .ph h2 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--neon-1); }
+:root[data-theme="dark"] .ph h2 { text-shadow: 0 0 12px color-mix(in srgb, var(--neon-1) 40%, transparent); }
 .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
 .row-top { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)) minmax(260px, 1.6fr) minmax(280px, 1.8fr); gap: 16px; }
@@ -228,12 +255,14 @@ main { padding: 18px 24px 40px; max-width: 1680px; width: 100%; display: flex; f
 
 /* ================= Ranking (Segmentbalken) ================= */
 .ranking { display: flex; flex-direction: column; gap: 9px; }
-.rk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; cursor: pointer; }
+.rk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; cursor: pointer; width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; padding: 3px 4px; border-radius: 8px; }
+.rk:hover { background: var(--surface-2); }
+.rk-gap { padding: 2px 4px; }
 .rk .nm { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rk .nm small { color: var(--text-muted); font-weight: 400; margin-left: 4px; }
 .rk .v { font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .rk .segs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; }
-.rk .segs i { height: 9px; border-radius: 2px; background: var(--surface-2); }
+.rk .segs i { height: 10px; border-radius: 2px; background: var(--surface-2); }
 .rank-note { margin-top: 10px; }
 
 /* ================= Aktivität ================= */
@@ -254,7 +283,7 @@ main { padding: 18px 24px 40px; max-width: 1680px; width: 100%; display: flex; f
 .arrow { border: 0; background: none; color: var(--warn); cursor: pointer; font-size: 12px; padding: 4px 8px; }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .cal .wd { font-size: 10px; color: var(--text-muted); text-align: center; text-transform: uppercase; }
-.cal .d { aspect-ratio: 1 / .78; border-radius: 6px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); min-width: 0; }
+.cal .d { aspect-ratio: 1 / .78; max-height: 48px; width: 100%; justify-self: center; border-radius: 6px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); min-width: 0; }
 .cal .d.has { color: var(--text-primary); }
 .cal .d b { font-size: 9px; font-weight: 600; font-variant-numeric: tabular-nums; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal .d.today { outline: 1px solid var(--neon-1); }
@@ -361,6 +390,10 @@ dialog::backdrop { background: rgba(8, 3, 16, .65); }
   .shell:not(.expanded) .logo, .shell:not(.expanded) .item span, .shell:not(.expanded) .caret,
   .shell:not(.expanded) .sub, .shell:not(.expanded) .side-foot { display: none; }
   .shell:not(.expanded) .item { justify-content: center; padding: 10px; }
+  .shell:not(.expanded) .group.open .sub {
+    display: flex; position: fixed; left: 60px; z-index: 30; min-width: 200px; padding: 8px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.45);
+  }
   .shell:not(.expanded) .brand { justify-content: center; padding: 4px 0 20px; }
 }
 @media (max-width: 640px) {

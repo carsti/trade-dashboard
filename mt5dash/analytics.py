@@ -12,6 +12,8 @@ from collections import Counter, defaultdict
 # MT5-Konstanten
 DEAL_TYPE_BUY = 0
 DEAL_TYPE_SELL = 1
+DEAL_TYPE_BALANCE = 2   # Ein-/Auszahlung
+DEAL_TYPE_CREDIT = 3    # Kredit: ändert nicht die Balance
 DEAL_ENTRY_IN = 0
 DEAL_ENTRY_OUT = 1
 DEAL_ENTRY_INOUT = 2
@@ -161,6 +163,21 @@ def _pct(net: float, base: float) -> float | None:
     return round(100 * net / base, 2) if base > 0 else None
 
 
+def capital_base(deals: list[dict], balance: float, t_from: int | None) -> float | None:
+    """Kapital, auf das sich die Rendite im Zeitraum bezieht.
+
+    Balance zu Zeitraumbeginn (aktuelle Balance minus aller Balance-Änderungen seitdem, also Trades UND
+    Ein-/Auszahlungen) plus Einzahlungen im Zeitraum. Bei "Gesamt" ist das die Summe der Einzahlungen.
+    Auszahlungen senken die Basis nicht – sonst ergäben abgezogene Gewinne absurde Renditen.
+    Liefert None, wenn keine sinnvolle (positive) Basis bestimmbar ist.
+    """
+    since = [d for d in deals if d.get("type") != DEAL_TYPE_CREDIT and (t_from is None or d["time"] >= t_from)]
+    start = balance - sum(deal_net(d) for d in since)
+    deposits = sum(d.get("profit", 0.0) for d in since if d.get("type") == DEAL_TYPE_BALANCE and d.get("profit", 0.0) > 0)
+    base = round(start + deposits, 2)
+    return base if base > 0.005 else None
+
+
 def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: int | None,
                  group: str = "account", accounts: set[str] | None = None, now: int | None = None) -> dict:
     """Erzeugt den kompletten Dashboard-Report.
@@ -170,8 +187,8 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
     accounts: nur diese Konto-Keys auswerten (None = alle); die Kontoliste enthält trotzdem alle Konten
     now: Bezugszeit für Heute/7 T/30 T (unabhängig vom gewählten Zeitraum)
 
-    Rendite in % bezieht sich auf das Startkapital des Zeitraums: Balance minus alles, was ab
-    Zeitraumbeginn realisiert wurde. Ein- und Auszahlungen im Zeitraum werden dabei nicht herausgerechnet.
+    Rendite in % bezieht sich auf das Kapital des Zeitraums (siehe capital_base): Balance zu Zeitraumbeginn
+    plus Einzahlungen im Zeitraum.
     """
     now = int(time.time()) if now is None else now
     today = now - now % DAY
@@ -192,8 +209,7 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
         closed_all = [p for p in positions if p["closed"]]
         start_balance = None
         if acc.get("balance") is not None:
-            later = sum(p["net"] for p in closed_all if t_from is None or p["close_time"] >= t_from)
-            start_balance = round(acc["balance"] - later, 2)
+            start_balance = capital_base(snap.get("deals", []), acc["balance"], t_from)
         selected = accounts is None or key in accounts
 
         comments_by_magic: dict[int, Counter] = defaultdict(Counter)

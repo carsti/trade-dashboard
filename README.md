@@ -16,17 +16,20 @@ ohne Python-Installation auf dem Zielrechner.
 - **Bot je Konto** oder **Bots kontoübergreifend** zusammengefasst (gleicher Name und gleiche Kontowährung).
 - Bots **umbenennen** (Name in der Tabelle anklicken). Standardname ist der Order-Kommentar des EAs plus Magic-Nummer.
 - Zeiträume: Heute, 7/30/90 Tage, laufendes Jahr, Gesamt, Von/Bis.
-- **Design**: dunkles Violett/Neon (Hell umschaltbar unter Einstellungen), Sidebar mit aufklappbaren Menüs.
+- **Design**: buntes Violett/Neon (Hell umschaltbar unter Einstellungen), Sidebar mit aufklappbaren Menüs
+  (eingeklappt als Flyout), Suche oben (Bot, Symbol, Magic). Jede Ansicht hat eine eigene Adresse
+  (z. B. `#/bots/tabelle`), Zurück/Vor im Browser funktioniert.
+- **Demo / Live** umschaltbar unter Einstellungen (oder Klick auf das DEMO-Abzeichen), ohne Neustart.
 - **Dashboard**: Neon-Ringe für Trefferquote, Bots im Plus und Gewinntage; Netto je Währung mit Rendite in %
-  und Heute / 7 T / 30 T; Konten als Balken (Klick filtert alles auf das Konto); Verlauf kumuliert oder täglich mit
-  Markierung des besten und schwächsten Tags; Bot-Ranking nach Rendite; **Aktivität** (letzte Trades);
+  und Heute / 7 T / 30 T; Konten als Balken (Klick zeigt nur dieses Konto, Strg+Klick mehrere); Verlauf kumuliert oder täglich mit
+  Markierung des besten und schwächsten Tags; Bot-Ranking nach Rendite (bei vielen Bots die besten 6 und schwächsten 4); **Aktivität** (letzte Trades);
   Kalender mit Tages-P&L; Trefferquote der meistgehandelten Symbole.
 - **Bots**: Karte pro Bot mit Mini-Kurve, Rendite, Trades, Treffer, PF, Max. DD und Hinweisen
   (⚠ Risiko bei Grid/Martingale-Muster: hohe Trefferquote, aber Ø Verlust ≥ 3× Ø Gewinn; ◷ Inaktiv nach 7 Tagen
-  ohne Trade), alternativ Tabelle; Bot-Vergleich der kumulierten Kurven.
+  ohne Trade), alternativ Tabelle; Bot-Vergleich der kumulierten Kurven (beliebige 8 Bots gleichzeitig).
 - **Analyse**: Ergebnis je Symbol, nach Wochentag und nach Uhrzeit (Serverzeit), großer Monatskalender.
-- Rendite in % bezieht sich auf das Startkapital des Zeitraums (Balance minus alles seit Zeitraumbeginn Realisierte);
-  Ein- und Auszahlungen im Zeitraum werden nicht herausgerechnet.
+- Rendite in % bezieht sich auf die Balance zu Zeitraumbeginn plus Einzahlungen im Zeitraum (bei „Gesamt“ also auf
+  die Summe der Einzahlungen). Auszahlungen senken die Basis nicht, abgezogene Gewinne verfälschen die Rendite also nicht.
 - **CSV-Export** (Excel-tauglich, Dezimalkomma).
 - Automatische Aktualisierung (Standard alle 60 s).
 

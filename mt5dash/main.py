@@ -7,9 +7,7 @@ import threading
 import urllib.request
 import webbrowser
 
-from . import demo_source
-from .config import Config, config_dir
-from .server import APP_ID, VERSION, AppState, serve
+from .server import APP_ID, VERSION, AppState, make_config, serve
 
 DEFAULT_PORT = 8765
 
@@ -52,17 +50,7 @@ def main(argv=None):
             webbrowser.open(url)
             return
 
-    if args.demo:
-        cfg = Config(config_dir() / "demo-config.json")
-        if not cfg.accounts():
-            for a in demo_source.DEMO_ACCOUNTS:
-                cfg.data["accounts"].append({"id": a["id"], "label": a["label"], "login": a["login"],
-                                             "server": a["server"], "password": "", "terminal_path": "",
-                                             "enabled": True, "allow_switch": False})
-            cfg.save()
-    else:
-        cfg = Config()
-
+    cfg = make_config(args.demo)
     state = AppState(cfg, demo=args.demo)
     httpd, _ = serve(state, args.port)
     threading.Thread(target=state.loop, daemon=True).start()

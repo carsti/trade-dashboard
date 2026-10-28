@@ -7,7 +7,7 @@ const S = {
   accFilter: new Set(),  // Konto-Keys; leer = alle Konten
   sort: { key: "net", asc: false }, search: "",
   selected: new Set(), selectionTouched: false,
-  colors: {},            // Bot-ID → Farbslot (folgt dem Bot, nicht dem Rang)
+  colors: {},            // Bot-ID → Farbslot, nur für Bots im Vergleich (folgt dem Bot, nicht dem Rang)
   calMonth: null,        // [Jahr, Monat]; null = Monat des letzten Handelstags
 };
 const SERIES = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8"];
@@ -49,6 +49,20 @@ function mix(a, b, t) {
   const [x, y] = [p(a), p(b)];
   return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("");
 }
+// Verlauf über mehrere Farben, t von 0 bis 1
+function grad(stops, t) {
+  const n = stops.length - 1, i = Math.min(n - 1, Math.floor(t * n));
+  return mix(stops[i], stops[i + 1], t * n - i);
+}
+// Bunte Neon-Verläufe wie im Referenzdesign: jedes Element bekommt seinen eigenen.
+// "Gut" sind kühle Töne (Cyan/Grün/Blau), "schlecht" warme (Pink/Rot/Orange) – der Wert steht immer als Text daneben.
+const PAL = {
+  gauge: [["#22d3ee", "#3b82f6", "#a855f7"], ["#f43f5e", "#ec4899", "#fb923c"], ["#2dd4bf", "#a3e635", "#facc15"]],
+  good: [["#22d3ee", "#34d399"], ["#3b82f6", "#22d3ee"], ["#a855f7", "#22d3ee"], ["#10b981", "#a3e635"], ["#6366f1", "#38bdf8"]],
+  bad: [["#ec4899", "#fb923c"], ["#d946ef", "#f43f5e"], ["#f43f5e", "#f59e0b"]],
+  donut: [["#facc15", "#f472b6"], ["#22d3ee", "#a3e635"], ["#3b82f6", "#22d3ee"], ["#f472b6", "#a855f7"], ["#fb923c", "#d946ef"]],
+};
+const palOf = (list, i) => list[i % list.length];
 
 // ================= Zeitraum =================
 function periodRange() {
@@ -76,10 +90,21 @@ function query() {
 }
 
 // ================= Laden & Rendern =================
+// Nur die Antwort der jeweils letzten Anfrage zeichnen: sonst kann ein langsamer, älterer
+// Abruf (z. B. der automatische) einen gerade gesetzten Filter oder Zeitraum wieder überschreiben.
+let loadSeq = 0;
 async function load() {
+  const seq = ++loadSeq;
   try {
     const [state, report] = await Promise.all([api("/api/state"), api("/api/report?" + query())]);
+    if (seq !== loadSeq) return;
     S.state = state; S.report = report;
+    // Filter auf inzwischen entfernte Konten verwerfen, sonst bliebe alles leer
+    const keys = new Set(report.accounts.map((a) => a.key));
+    if ([...S.accFilter].some((k) => !keys.has(k))) {
+      S.accFilter = new Set([...S.accFilter].filter((k) => keys.has(k)));
+      return load();
+    }
     render();
   } catch (e) {
     $("#sideStatus").innerHTML = `<span class="err">Verbindung zum Dashboard-Dienst verloren: ${esc(e.message)}</span>`;
@@ -91,7 +116,9 @@ const curTotals = () => S.report.totals.find((t) => t.currency === S.cur);
 function render() {
   const { state, report } = S;
   $("#demoBadge").hidden = !state.demo;
+  $$("#modeSeg button").forEach((b) => b.classList.toggle("on", (b.dataset.mode === "demo") === state.demo));
   $("#emptyState").hidden = state.accounts.length > 0;
+  document.querySelector("main").classList.toggle("no-accounts", !state.accounts.length);
   const errs = report.accounts.filter((a) => a.status === "error").length;
   $("#sideStatus").innerHTML = [
     state.refreshing ? "Aktualisiere…" : state.last_refresh ? `Stand ${new Date(state.last_refresh * 1000).toLocaleTimeString("de-DE")}` : "Lade Daten…",
@@ -106,11 +133,11 @@ function render() {
     S.cur = [...report.totals].sort((a, b) => b.trades - a.trades)[0]?.currency ?? null;
     S.calMonth = null;
   }
-  assignColors(report.bots);
   if (!S.selectionTouched) {
     const withTrades = report.bots.filter((b) => b.trades > 0 && b.currency === S.cur);
     S.selected = new Set([...withTrades.slice(0, 3), ...withTrades.slice(-1)].map((b) => b.id));
   }
+  assignColors();
   renderMenuAccounts();
   renderFilterBar();
   renderCurSeg();
@@ -119,12 +146,16 @@ function render() {
   $("#btnCsv").href = "/api/export.csv?" + query() + "&token=" + encodeURIComponent(window.API_TOKEN);
 }
 
-function assignColors(bots) {
-  for (const b of [...bots].sort((a, c) => a.id.localeCompare(c.id))) {
-    if (!(b.id in S.colors)) S.colors[b.id] = Object.keys(S.colors).length;
+// Farben gibt es nur für die (max. 8) Bots im Vergleich, damit auch bei vielen Bots jeder auswählbar ist
+function assignColors() {
+  for (const id of Object.keys(S.colors)) if (!S.selected.has(id)) delete S.colors[id];
+  for (const id of S.selected) {
+    if (id in S.colors) continue;
+    const used = new Set(Object.values(S.colors)), free = SERIES.findIndex((_, i) => !used.has(i));
+    if (free < 0) S.selected.delete(id); else S.colors[id] = free;
   }
 }
-const colorOf = (id) => { const i = S.colors[id]; return i < SERIES.length ? css(SERIES[i]) : null; };
+const colorOf = (id) => id in S.colors ? css(SERIES[S.colors[id]]) : null;
 
 // Hinweise je Bot: Risiko-Muster und Inaktivität (immer Symbol + Text, nie nur Farbe)
 function flags(b) {
@@ -149,15 +180,17 @@ function renderFilterBar() {
     ` <button class="btn ghost" data-clear>Alle Konten zeigen</button>`;
 }
 $("#filterBar").addEventListener("click", (e) => {
-  const k = e.target.dataset.k;
-  if (k) S.accFilter.delete(k);
-  else if (e.target.hasAttribute("data-clear")) S.accFilter.clear();
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.k) S.accFilter.delete(b.dataset.k);
+  else if (b.hasAttribute("data-clear")) S.accFilter.clear();
   else return;
   S.selectionTouched = false; load();
 });
-function toggleAccount(key) {
+// Klick zeigt nur dieses Konto (erneuter Klick = wieder alle); mit Strg/Shift werden Konten hinzugefügt
+function toggleAccount(key, additive = false) {
   if (key === "") S.accFilter.clear();
-  else S.accFilter.has(key) ? S.accFilter.delete(key) : S.accFilter.add(key);
+  else if (additive) S.accFilter.has(key) ? S.accFilter.delete(key) : S.accFilter.add(key);
+  else S.accFilter = S.accFilter.size === 1 && S.accFilter.has(key) ? new Set() : new Set([key]);
   if (S.accFilter.size === S.report.accounts.length) S.accFilter.clear();
   S.selectionTouched = false; load();
 }
@@ -167,7 +200,7 @@ function renderMenuAccounts() {
     S.report.accounts.map((a) => `<button data-acc="${esc(a.key)}" class="${f.has(a.key) ? "on" : ""}"><span class="dot ${a.status || "wait"}"></span>${esc(trunc(a.label, 20))}</button>`).join("");
 }
 $("#menuAccounts").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-acc]"); if (b) toggleAccount(b.dataset.acc);
+  const b = e.target.closest("button[data-acc]"); if (b) toggleAccount(b.dataset.acc, e.ctrlKey || e.metaKey || e.shiftKey);
 });
 
 function renderCurSeg() {
@@ -257,15 +290,14 @@ function renderDashboard() {
 }
 
 // Segmentierter Neon-Ring wie im Referenzdesign: Segmente laufen von Cyan nach Magenta
-function neonGauge(value, big, small) {
+function neonGauge(value, big, small, stops) {
   const N = 44, r = 46, c = 56, v = Math.max(0, Math.min(100, value ?? 0)), on = Math.round(N * v / 100);
-  const a = css("--neon-1"), b = css("--neon-2");
   let segs = "";
   for (let i = 0; i < N; i++) {
     const a0 = (i / N) * 2 * Math.PI - Math.PI / 2 + 0.03, a1 = ((i + 1) / N) * 2 * Math.PI - Math.PI / 2 - 0.03;
     const p = (ang, rr) => `${(c + rr * Math.cos(ang)).toFixed(2)},${(c + rr * Math.sin(ang)).toFixed(2)}`;
     const d = `M${p(a0, r)}A${r},${r} 0 0 1 ${p(a1, r)}`;
-    segs += i < on ? `<path d="${d}" stroke="${mix(a, b, i / Math.max(1, N - 1))}" stroke-width="9" fill="none"/>`
+    segs += i < on ? `<path d="${d}" stroke="${grad(stops, i / Math.max(1, N - 1))}" stroke-width="9" fill="none"/>`
                    : `<path d="${d}" class="seg-off" stroke-width="9" fill="none"/>`;
   }
   return `<svg viewBox="0 0 112 112" role="img" aria-label="${esc(big)}">${segs}
@@ -274,7 +306,8 @@ function neonGauge(value, big, small) {
 }
 function renderGauges(t) {
   const set = (id, value, big, small, title, text) => {
-    $(id).innerHTML = `${neonGauge(value, big, small)}<div class="g-title">${title}</div><div class="g-text">${text}</div>`;
+    const stops = PAL.gauge[["#gWin", "#gBots", "#gDays"].indexOf(id)];
+    $(id).innerHTML = `${neonGauge(value, big, small, stops)}<div class="g-title" style="color:${stops[0]}">${title}</div><div class="g-text">${text}</div>`;
   };
   const traded = S.report.bots.filter((b) => b.trades > 0 && b.currency === S.cur), plus = traded.filter((b) => b.net > 0).length;
   const days = t?.daily ?? [], gDays = days.filter((d) => d[1] > 0).length;
@@ -299,16 +332,15 @@ function renderHero() {
 function renderAccBars() {
   const accs = S.report.accounts, f = S.accFilter;
   const max = Math.max(1e-9, ...accs.map((a) => Math.abs(a.return_pct ?? 0)));
-  const g = [css("--neon-1"), css("--neon-2")], r = [css("--neon-3"), css("--bad")];
-  $("#accBars").innerHTML = `<div class="ph"><h2>Konten</h2><span class="muted small">Klick filtert</span></div>` + (accs.map((a) => {
-    const w = 100 * Math.abs(a.return_pct ?? 0) / max, [c1, c2] = (a.return_pct ?? 0) >= 0 ? g : r;
+  $("#accBars").innerHTML = `<div class="ph"><h2>Konten</h2><span class="muted small">Klick filtert · Strg+Klick mehrere</span></div>` + (accs.map((a, i) => {
+    const w = 100 * Math.abs(a.return_pct ?? 0) / max, [c1, c2] = palOf((a.return_pct ?? a.net ?? 0) >= 0 ? PAL.good : PAL.bad, i);
     return `<button class="acc-bar ${f.size ? (f.has(a.key) ? "on" : "off") : ""}" data-key="${esc(a.key)}" aria-pressed="${f.has(a.key)}">
       <div class="t"><b><span class="dot ${a.status || "wait"}"></span>${esc(a.label)}</b><span class="${cls(a.net)}">${signed(a.net, a.currency)} · ${pct(a.return_pct)}</span></div>
       <div class="track"><i style="width:${Math.max(2, w).toFixed(1)}%;background:linear-gradient(90deg,${c1},${c2})"></i></div>
     </button>`;
   }).join("") || `<div class="muted">Keine aktiven Konten</div>`);
 }
-$("#accBars").addEventListener("click", (e) => { const b = e.target.closest(".acc-bar"); if (b) toggleAccount(b.dataset.key); });
+$("#accBars").addEventListener("click", (e) => { const b = e.target.closest(".acc-bar"); if (b) toggleAccount(b.dataset.key, e.ctrlKey || e.metaKey || e.shiftKey); });
 
 // Hauptchart: kumuliert (Neon-Linie mit Markierung bester/schlechtester Tag) oder Tagesbalken
 function renderMain() {
@@ -364,22 +396,31 @@ $("#chartTabs").addEventListener("click", (e) => {
   renderMain();
 });
 
-// Ranking als Segmentbalken, nach Rendite in % (vergleichbar zwischen großen und kleinen Konten)
+// Ranking als bunte Segmentbalken, nach Rendite in % (vergleichbar zwischen großen und kleinen Konten).
+// Bei vielen Bots: die besten 6 und die schwächsten 4, damit Verlierer nicht unter den Tisch fallen.
 function renderRanking() {
-  const bots = S.report.bots.filter((b) => b.trades > 0).sort((a, b) => (b.return_pct ?? 0) - (a.return_pct ?? 0)).slice(0, 10);
-  const max = Math.max(1e-9, ...bots.map((b) => Math.abs(b.return_pct ?? 0)));
-  const g = [css("--neon-1"), css("--neon-4")], r = [css("--neon-3"), css("--bad")];
+  const key = (b) => b.return_pct ?? (b.net > 0 ? 0 : b.net < 0 ? -1e-9 : 0);
+  const all = S.report.bots.filter((b) => b.trades > 0).sort((a, b) => key(b) - key(a) || b.net - a.net);
+  const bots = all.length > 10 ? [...all.slice(0, 6), null, ...all.slice(-4)] : all;
+  const max = Math.max(1e-9, ...all.map((b) => Math.abs(b.return_pct ?? 0)));
+  const maxNet = Math.max(1e-9, ...all.map((b) => Math.abs(b.net)));
+  let gi = 0, bi = 0;
   $("#ranking").innerHTML = bots.map((b) => {
-    const n = Math.max(1, Math.round(20 * Math.abs(b.return_pct ?? 0) / max)), [c1, c2] = b.net >= 0 ? g : r;
+    if (!b) return `<div class="rk-gap muted small">… ${all.length - 10} weitere · schwächste:</div>`;
+    // ohne Rendite (kein Startkapital bekannt) nach Netto skalieren
+    const rel = b.return_pct != null ? Math.abs(b.return_pct) / max : Math.abs(b.net) / maxNet;
+    const n = Math.max(1, Math.round(20 * rel)), [c1, c2] = b.net >= 0 ? palOf(PAL.good, gi++) : palOf(PAL.bad, bi++);
     const segs = [...Array(20)].map((_, i) => i < n ? `<i style="background:${mix(c1, c2, i / 19)}"></i>` : "<i></i>").join("");
-    return `<div class="rk" data-id="${esc(b.id)}" title="${esc(b.name)} · ${esc(b.accounts.join(", "))}">
+    return `<button class="rk" data-id="${esc(b.id)}" title="${esc(b.name)} · ${esc(b.accounts.join(", "))} – Klick öffnet die Bot-Karte">
       <span class="nm">${esc(b.name)}<small>${esc(trunc(b.accounts.join(", "), 18))}</small></span>
-      <span class="v"><b class="${cls(b.net)}">${pct(b.return_pct)}</b> <span class="muted">${short(b.net)} ${esc(b.currency)}</span></span>
-      <span class="segs">${segs}</span></div>`;
+      <span class="v"><b class="${cls(b.return_pct ?? b.net)}">${pct(b.return_pct)}</b> <span class="muted">${b.net > 0 ? "+" : ""}${short(b.net)} ${esc(b.currency)}</span></span>
+      <span class="segs">${segs}</span></button>`;
   }).join("") || `<div class="empty-chart">Keine geschlossenen Trades im Zeitraum</div>`;
 }
 $("#ranking").addEventListener("click", (e) => {
   const r = e.target.closest(".rk"); if (!r) return;
+  // Suchfilter leeren, sonst ist die Karte des Bots evtl. ausgeblendet
+  S.search = ""; $("#search").value = ""; $("#topSearch").value = "";
   setView("bots", "cards");
   const card = document.querySelector(`.bot[data-id="${CSS.escape(r.dataset.id)}"]`);
   if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1600); }
@@ -437,17 +478,17 @@ document.addEventListener("mouseout", (e) => { if (e.target.closest?.(".cal") &&
 // Donut-Reihe: die meistgehandelten Symbole mit Trefferquote
 function renderSymbolDonuts(t) {
   const syms = [...(t?.by_symbol ?? [])].sort((a, b) => b.trades - a.trades).slice(0, 5);
-  const a = css("--neon-1"), b = css("--neon-2"), r = 26, c = 2 * Math.PI * r;
-  $("#symbolDonuts").innerHTML = syms.map((s, i) => `<div class="donut" title="${esc(s.symbol)}: ${s.trades} Trades, ${nf(1).format(s.win_rate)} % Treffer">
+  const r = 26, c = 2 * Math.PI * r;
+  $("#symbolDonuts").innerHTML = syms.map((s, i) => { const [a, b] = palOf(PAL.donut, i); return `<div class="donut" title="${esc(s.symbol)}: ${s.trades} Trades, ${nf(1).format(s.win_rate)} % Treffer">
       <div class="box"><svg viewBox="0 0 64 64" role="img" aria-label="${esc(s.symbol)} ${nf(0).format(s.win_rate)} % Treffer">
         <defs><linearGradient id="dn${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
         <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--border)" stroke-width="6"/>
         <circle cx="32" cy="32" r="${r}" fill="none" stroke="url(#dn${i})" stroke-width="6" stroke-linecap="round"
           stroke-dasharray="${(c * s.win_rate / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 32 32)"/>
         <text x="32" y="33" text-anchor="middle" dominant-baseline="middle">${nf(0).format(s.win_rate)}%</text></svg></div>
-      <span class="pin"></span>
+      <span class="pin" style="background:${a}"></span>
       <span class="lb">${esc(s.symbol)}<small class="${cls(s.net)}">${signed(s.net)}</small></span>
-    </div>`).join("") || `<div class="empty-chart">Keine Trades im Zeitraum</div>`;
+    </div>`; }).join("") || `<div class="empty-chart">Keine Trades im Zeitraum</div>`;
 }
 
 // ================= Bots =================
@@ -493,7 +534,7 @@ function filteredSorted(bots) {
   });
 }
 const subline = (b) => `Magic ${b.magics.join(", ")} · ${b.accounts.join(", ")}${b.symbols.length ? " · " + b.symbols.slice(0, 3).join(", ") : ""}`;
-const selBox = (b) => `<input type="checkbox" class="sel" ${S.selected.has(b.id) ? "checked" : ""} ${!colorOf(b.id) ? "disabled title='Nur 8 Farben verfügbar'" : ""} aria-label="Im Vergleich anzeigen">`;
+const selBox = (b) => `<input type="checkbox" class="sel" ${S.selected.has(b.id) ? "checked" : ""} ${!S.selected.has(b.id) && S.selected.size >= SERIES.length ? `disabled title="Höchstens ${SERIES.length} Bots gleichzeitig vergleichen"` : ""} aria-label="Im Vergleich anzeigen">`;
 function renderCards(bots) {
   $("#botCards").innerHTML = filteredSorted(bots).map((b) => {
     const color = colorOf(b.id), fl = flags(b);
@@ -572,8 +613,9 @@ $("#botTable").addEventListener("click", (e) => {
 function toggleSel(bot, on) {
   S.selectionTouched = true;
   on ? S.selected.add(bot.id) : S.selected.delete(bot.id);
+  assignColors();
   if (on && bot.currency !== S.cur) { S.cur = bot.currency; S.calMonth = null; renderCurSeg(); }
-  renderLines();
+  renderBotsView();  // Farbmarken und gesperrte Häkchen aktualisieren
 }
 function startRename(el, bot) {
   // pro Konto: Name gilt für login:magic; zusammengefasst: für die Magic-Nummer(n) auf allen Konten
@@ -613,7 +655,11 @@ function renderAccounts() {
     </div>`;
   }).join("") || `<div class="muted">Keine aktiven Konten</div>`;
 }
-$("#accountCards").addEventListener("click", (e) => { const k = e.target.dataset.filter; if (k != null) toggleAccount(k); });
+$("#accountCards").addEventListener("click", (e) => {
+  const k = e.target.closest("[data-filter]")?.dataset.filter; if (k == null) return;
+  if (S.accFilter.has(k)) { S.accFilter.delete(k); S.selectionTouched = false; load(); }
+  else { toggleAccount(k); setView("dashboard"); }
+});
 
 // ================= Analyse =================
 function renderAnalysis() {
@@ -662,7 +708,9 @@ function vBars(el, labels, data) {
 // ================= Kontodialog =================
 const accDialog = $("#accDialog");
 function openAccounts(newForm) {
+  if (!S.state || !S.report) return;
   renderAccManage();
+  $("#setMsg").textContent = "";
   const st = S.state.settings, f = $("#setForm");
   f.refresh_seconds.value = st.refresh_seconds; f.history_days.value = st.history_days; f.default_terminal_path.value = st.default_terminal_path;
   if (newForm) resetAccForm();
@@ -690,8 +738,11 @@ $("#accManage").addEventListener("click", async (e) => {
     $("#accFormTitle").textContent = "Konto bearbeiten"; $("#accMsg").textContent = "";
   }
   if (del && confirm("Konto wirklich entfernen? (Am MT5-Konto selbst ändert sich nichts.)")) {
-    await api("/api/accounts/delete", { id: del });
-    await load(); renderAccManage();
+    try {
+      await api("/api/accounts/delete", { id: del });
+      if ($("#accForm").id.value === del) resetAccForm();
+      await load(); renderAccManage();
+    } catch (err) { $("#accMsg").className = "small neg"; $("#accMsg").textContent = "⚠ " + err.message; }
   }
 });
 function resetAccForm() {
@@ -714,18 +765,50 @@ $("#accForm").addEventListener("submit", async (e) => {
 });
 $("#setForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  await api("/api/settings", Object.fromEntries(new FormData(e.target)));
-  await load();
+  const msg = $("#setMsg");
+  try {
+    await api("/api/settings", Object.fromEntries(new FormData(e.target)));
+    msg.className = "small pos"; msg.textContent = "✓ Gespeichert";
+    await load();
+  } catch (err) { msg.className = "small neg"; msg.textContent = "⚠ " + err.message; }
 });
 
 // ================= Navigation =================
+// Jede Ansicht hat eine eigene Adresse (#/bots/tabelle …): Zurück/Vor im Browser und Lesezeichen funktionieren.
+const SUB_SLUG = { cards: "karten", table: "tabelle", compare: "vergleich", symbols: "symbole", time: "zeit", calendar: "kalender" };
+const VIEW_SLUG = { dashboard: "dashboard", bots: "bots", accounts: "konten", analysis: "analyse" };
+const VIEW_SUBS = { bots: ["cards", "table", "compare"], analysis: ["symbols", "time", "calendar"] };
+const hashOf = (v, sub) => "#/" + VIEW_SLUG[v] + (sub ? "/" + SUB_SLUG[sub] : "");
+function parseHash() {
+  const [v, sub] = location.hash.replace(/^#\/?/, "").split("/");
+  const view = Object.keys(VIEW_SLUG).find((k) => VIEW_SLUG[k] === v);
+  if (!view) return null;
+  const s = Object.keys(SUB_SLUG).find((k) => SUB_SLUG[k] === sub);
+  return [view, VIEW_SUBS[view]?.includes(s) ? s : null];
+}
+const sidebarCollapsed = () => $("#shell").classList.contains("collapsed") ||
+  (matchMedia("(max-width: 900px)").matches && !$("#shell").classList.contains("expanded"));
+
+function openGroup(g) {
+  // Akkordeon: immer nur ein Menü offen
+  $$("#menu .group").forEach((x) => x.classList.toggle("open", x === g && !!g));
+  if (g && sidebarCollapsed()) {
+    // eingeklappte Sidebar: Untermenü als Flyout neben dem Symbol
+    const r = g.querySelector(".item").getBoundingClientRect();
+    g.querySelector(".sub").style.top = Math.min(r.top, innerHeight - g.querySelector(".sub").offsetHeight - 8) + "px";
+  }
+}
+
 function setView(v, sub = null) {
+  if (!VIEWS[v]) v = "dashboard";
+  if (sub && !VIEW_SUBS[v]?.includes(sub)) sub = null;
   S.view = v; S.sub = sub;
+  if (location.hash !== hashOf(v, sub)) history.pushState(null, "", hashOf(v, sub));
   $$(".view").forEach((s) => { s.hidden = s.dataset.view !== v; });
   $$("#menu .item").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
   $$("#menu .sub button[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === v && b.dataset.sub === sub));
-  const grp = document.querySelector(`.group[data-group="${v}"]`);
-  if (grp) grp.classList.add("open");
+  if (sidebarCollapsed()) openGroup(null);
+  else { const grp = document.querySelector(`.group[data-group="${v}"]`); if (grp && !grp.classList.contains("open")) openGroup(grp); }
   $("#viewTitle").textContent = VIEWS[v];
   $("#viewSub").textContent = SUBS[sub] ?? (v === "dashboard" ? "Übersicht" : "Alle");
   if (v === "bots" && (sub === "cards" || sub === "table")) setBotView(sub, false);
@@ -735,17 +818,30 @@ function setView(v, sub = null) {
   if (target) setTimeout(() => $(target).scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   else scrollTo({ top: 0 });
 }
+addEventListener("popstate", () => { const h = parseHash(); setView(...(h ?? ["dashboard", null])); });
+
 $("#menu").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.classList.contains("has-sub")) {
     const g = b.closest(".group");
-    if (!b.dataset.view || S.view === b.dataset.view) { g.classList.toggle("open"); if (!b.dataset.view) return; }
+    // Menü der aktuellen Ansicht (oder Einstellungen) nur auf-/zuklappen, sonst Ansicht wechseln und aufklappen
+    if (sidebarCollapsed()) {
+      // eingeklappt: Ansicht wechseln und Untermenü als Flyout zeigen (zweiter Klick schließt es)
+      const wasOpen = g.classList.contains("open");
+      if (b.dataset.view && S.view !== b.dataset.view) setView(b.dataset.view);
+      return openGroup(wasOpen ? null : g);
+    }
+    if (!b.dataset.view || S.view === b.dataset.view) return openGroup(g.classList.contains("open") ? null : g);
   }
   if (b.dataset.view) setView(b.dataset.view, b.dataset.sub ?? null);
+  else if (b.closest(".sub") && sidebarCollapsed()) openGroup(null);
 });
+// Flyout der eingeklappten Sidebar schließt bei Klick daneben
+document.addEventListener("click", (e) => { if (sidebarCollapsed() && !e.target.closest("#menu")) openGroup(null); });
 $("#btnBurger").addEventListener("click", () => {
   const sh = $("#shell");
   matchMedia("(max-width: 900px)").matches ? sh.classList.toggle("expanded") : sh.classList.toggle("collapsed");
+  openGroup(sidebarCollapsed() ? null : document.querySelector(`.group[data-group="${S.view}"]`));
   setTimeout(() => S.report && render(), 50);
 });
 
@@ -754,7 +850,7 @@ function setBotView(v, rerender = true) {
   $$("#botViewSeg button").forEach((x) => x.classList.toggle("on", x.dataset.b === v));
   if (rerender && S.report) renderBotsView();
 }
-$("#botViewSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setBotView(b.dataset.b); });
+$("#botViewSeg").addEventListener("click", (e) => { const b = e.target.closest("button[data-b]"); if (b) setView("bots", b.dataset.b); });
 
 $("#periodSeg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
@@ -771,8 +867,30 @@ $("#groupSeg").addEventListener("click", (e) => {
   $$("#groupSeg button").forEach((x) => x.classList.toggle("on", x === b));
   load();
 });
-$("#search").addEventListener("input", (e) => { S.search = e.target.value; renderBotsView(); });
-$("#btnRefresh").addEventListener("click", async () => { await api("/api/refresh", {}); setTimeout(load, 1500); });
+$("#search").addEventListener("input", (e) => { S.search = e.target.value; $("#topSearch").value = S.search; renderBotsView(); });
+// Suche oben: springt zu den Bots und filtert dort
+$("#topSearch").addEventListener("input", (e) => {
+  S.search = e.target.value; $("#search").value = S.search;
+  if (S.view !== "bots") setView("bots", S.botView);
+  else if (S.report) renderBotsView();
+});
+$("#topSearchForm").addEventListener("submit", (e) => { e.preventDefault(); setView("bots", S.botView); });
+$("#btnRefresh").addEventListener("click", async (e) => {
+  const b = e.currentTarget; b.classList.add("spin");
+  try { await api("/api/refresh", {}); } catch (err) { /* Status zeigt den Fehler beim nächsten Laden */ }
+  setTimeout(() => { load(); b.classList.remove("spin"); }, 1500);
+});
+// Demo-Daten ⇄ echte Konten
+async function setMode(demo) {
+  if (S.state && S.state.demo === demo) return;
+  try {
+    await api("/api/mode", { demo });
+    S.accFilter.clear(); S.selectionTouched = false; S.colors = {}; S.cur = null; S.calMonth = null;
+    setTimeout(load, 300); setTimeout(load, 1500);
+  } catch (err) { alert("Umschalten fehlgeschlagen: " + err.message); }
+}
+$("#modeSeg").addEventListener("click", (e) => { const b = e.target.closest("button[data-mode]"); if (b) setMode(b.dataset.mode === "demo"); });
+$("#demoBadge").addEventListener("click", () => setMode(false));
 $("#btnAccounts").addEventListener("click", () => openAccounts(true));
 $("#btnTheme").addEventListener("click", () => {
   const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
@@ -787,6 +905,11 @@ $("#btnQuit").addEventListener("click", async () => {
 });
 let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => S.report && render(), 150); });
 
-try { const v = localStorage.getItem("view"); setView(VIEWS[v] ? v : "dashboard"); } catch (e) { setView("dashboard"); }
+{
+  let start = parseHash();
+  if (!start) { try { const v = localStorage.getItem("view"); start = [VIEWS[v] ? v : "dashboard", null]; } catch (e) { start = ["dashboard", null]; } }
+  history.replaceState(null, "", hashOf(...start));
+  setView(...start);
+}
 load();
 setInterval(() => { if (!accDialog.open && !document.querySelector("input.renaming")) load(); }, 10000);
