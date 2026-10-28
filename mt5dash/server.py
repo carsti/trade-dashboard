@@ -18,6 +18,7 @@ from . import analytics, demo_source, mt5_source
 from .config import Config, config_dir
 
 APP_ID = "mt5-bot-dashboard"
+DISCOVERY_PORT = 8764  # UDP: andere Geräte finden darüber das Dashboard im Netzwerk
 VERSION = "4"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
 
 
@@ -284,3 +285,54 @@ def lan_ip() -> str | None:
     except OSError:
         return None
     return None if ip.startswith("127.") else ip
+
+
+def answer_discovery(state: "AppState", port: int):
+    """Beantwortet Suchanfragen anderer Geräte ("Wo läuft das Dashboard?") mit dem eigenen HTTP-Port."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("0.0.0.0", DISCOVERY_PORT))
+    except OSError:
+        return  # Port belegt (z. B. zweite Instanz): dann antwortet eben die andere
+    sock.settimeout(1)
+    with sock:
+        while not state.stop.is_set():
+            try:
+                data, addr = sock.recvfrom(256)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            if data == f"{APP_ID}?".encode() and state.cfg.accounts():  # nur ein Dashboard mit Konten meldet sich
+                sock.sendto(f"{APP_ID} {VERSION} {port} {socket.gethostname()}".encode(), addr)
+
+
+def find_dashboard(timeout: float = 1.5) -> tuple[str, str] | None:
+    """Sucht per Broadcast ein Dashboard mit Konten im Netzwerk. Liefert (URL, PC-Name) oder None."""
+    targets = ["255.255.255.255"]
+    ip = lan_ip()
+    if ip:
+        targets.append(ip.rsplit(".", 1)[0] + ".255")  # Heimnetze sind fast immer /24
+    own = {ip, "127.0.0.1"}
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.settimeout(0.3)
+            end = time.time() + timeout
+            for t in targets:
+                try:
+                    sock.sendto(f"{APP_ID}?".encode(), (t, DISCOVERY_PORT))
+                except OSError:
+                    pass
+            while time.time() < end:
+                try:
+                    data, addr = sock.recvfrom(256)
+                except socket.timeout:
+                    continue
+                parts = data.decode(errors="replace").split(" ", 3)
+                if len(parts) == 4 and parts[0] == APP_ID and addr[0] not in own:
+                    return f"http://{addr[0]}:{parts[2]}/", parts[3]
+    except OSError:
+        return None
+    return None

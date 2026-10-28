@@ -44,9 +44,13 @@ ohne Python-Installation auf dem Zielrechner.
 
 ### Von anderen Geräten aus (Handy, Tablet, zweiter PC)
 
-Die exe läuft nur auf dem PC mit den MT5-Terminals. Andere Geräte im selben Netzwerk öffnen einfach im Browser die
-Adresse, die das Konsolenfenster unter „Im Netzwerk“ anzeigt, z. B. `http://192.168.1.20:8765/`. Auf den anderen
-Geräten muss nichts installiert werden.
+Die Daten liest immer die exe auf dem Trading-PC (dort laufen die MT5-Terminals und sind die Konten eingerichtet).
+Auf anderen Geräten gibt es zwei Wege:
+
+- **Dieselbe exe starten** (auf jedem Windows-PC): Sind auf dem Gerät keine Konten eingerichtet, sucht die exe das
+  Dashboard im Netzwerk und öffnet es im Browser. Mit `--server` startet sie stattdessen immer ein eigenes Dashboard.
+- **Nur Browser** (Handy, Tablet, Mac): die Adresse öffnen, die das Konsolenfenster auf dem Trading-PC unter
+  „Im Netzwerk“ anzeigt, z. B. `http://192.168.1.20:8765/`.
 
 - Beim ersten Start fragt die Windows-Firewall nach: **„Private Netzwerke“ zulassen**. Wurde das abgelehnt, unter
   *Windows-Sicherheit → Firewall → Zugriff von Apps durch die Firewall zulassen* nachholen.

@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import sys
 import threading
+import time
 import urllib.request
 import webbrowser
 
-from .server import APP_ID, VERSION, AppState, lan_ip, make_config, serve
+from .server import (APP_ID, VERSION, AppState, answer_discovery, find_dashboard, lan_ip, make_config,
+                     serve)
 
 DEFAULT_PORT = 8765
 
@@ -30,6 +32,8 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--local", action="store_true", help="nur auf diesem PC erreichbar, nicht im Netzwerk")
+    ap.add_argument("--server", action="store_true",
+                    help="immer einen eigenen Server starten, kein Dashboard im Netzwerk suchen")
     args = ap.parse_args(argv)
 
     url = f"http://127.0.0.1:{args.port}/"
@@ -52,9 +56,26 @@ def main(argv=None):
             return
 
     cfg = make_config(args.demo)
+    if not cfg.accounts() and not (args.server or args.local):
+        # Keine Konten auf diesem Gerät (z. B. Laptop/zweiter PC ohne MT5): das Dashboard des Trading-PCs öffnen.
+        print("Keine Konten auf diesem Gerät eingerichtet, suche das Dashboard im Netzwerk ...")
+        found = find_dashboard()
+        if found:
+            remote_url, host = found
+            print(f"Dashboard auf '{host}' gefunden: {remote_url}")
+            if not args.no_browser:
+                webbrowser.open(remote_url)
+            print("Das Fenster schließt sich gleich, das Dashboard läuft im Browser weiter.")
+            time.sleep(8)
+            return
+        print("Kein Dashboard im Netzwerk gefunden (läuft die exe auf dem Trading-PC? Firewall freigegeben?).")
+        print("Starte hier ein eigenes Dashboard. Konten unter 'Konten' anlegen, dafür muss MT5 installiert sein.")
+
     state = AppState(cfg, demo=args.demo)
     httpd, _ = serve(state, args.port, "127.0.0.1" if args.local else "0.0.0.0")
     threading.Thread(target=state.loop, daemon=True).start()
+    if not args.local:
+        threading.Thread(target=answer_discovery, args=(state, args.port), daemon=True).start()
 
     print("=" * 60)
     print(" MT5 Bot Dashboard" + (" (DEMO)" if args.demo else ""))
