@@ -36,6 +36,7 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(b["trades"], 0)
         self.assertEqual(b["floating"], -4.0)
         self.assertEqual(b["open_count"], 1)
+        self.assertEqual(b["result"], -4.0)
 
     def test_partial_close_counts_once_when_fully_closed(self):
         deals = [deal(1, 1, 100, 0, 5, vol=1.0),
@@ -107,7 +108,7 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(rep["bots"][0]["return_pct"], t["return_pct"])
         self.assertEqual(rep["accounts"][0]["return_pct"], t["return_pct"])
 
-    def test_breakdowns_and_recent_trades(self):
+    def test_breakdowns_and_bot_result(self):
         day = analytics.DAY
         # 5.1.1970 = Montag; Schließung 14:00 Uhr
         deals = [deal(1, 1, 4 * day, 0, 5, comment="A"), deal(2, 1, 4 * day + 14 * 3600, 1, 5, profit=10),
@@ -118,7 +119,8 @@ class AnalyticsTest(unittest.TestCase):
         self.assertEqual(t["by_weekday"][1], [-4.0, 1])   # Dienstag
         self.assertEqual(t["by_hour"][14], [10.0, 1])
         self.assertEqual(t["by_symbol"], [{"symbol": "EURUSD", "net": 6.0, "trades": 2, "win_rate": 50.0}])
-        self.assertEqual([(r["net"], r["bot"]) for r in rep["recent_trades"]], [(-4.0, "A (5)"), (10.0, "A (5)")])
+        # beide Trades des Bots sind zu einem Ergebnis verrechnet
+        self.assertEqual([(b["name"], b["trades"], b["net"], b["result"]) for b in rep["bots"]], [("A (5)", 2, 6.0, 6.0)])
 
     def test_return_pct_ignores_withdrawn_profits(self):
         # 500 eingezahlt, 980 Gewinn, 1000 ausgezahlt → Balance 480. Früher: Basis 480 − 980 < 0 → keine Rendite

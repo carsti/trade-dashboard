@@ -269,6 +269,10 @@ main.no-accounts .view { display: none; }
 .activity { display: flex; flex-direction: column; gap: 2px; max-height: 330px; overflow-y: auto; }
 .act { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 10px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--border); }
 .act:last-child { border-bottom: 0; }
+button.act { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 6px; }
+button.act:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.act-sums { position: sticky; bottom: 0; margin-top: auto; background: var(--surface-1); border-top: 1px solid var(--border); }
+.act-sum .ic { background: color-mix(in srgb, var(--text-primary) 10%, transparent); }
 .act .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
 .act .ic.pos { background: color-mix(in srgb, var(--good) 18%, transparent); }
 .act .ic.neg { background: color-mix(in srgb, var(--bad) 18%, transparent); }
