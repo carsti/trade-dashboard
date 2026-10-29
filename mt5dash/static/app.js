@@ -285,7 +285,7 @@ function renderDashboard() {
   renderAccBars();
   renderMain();
   renderRanking();
-  renderActivity();
+  renderBotResults();
   renderCalendar();
   renderSymbolDonuts(t);
 }
@@ -420,21 +420,34 @@ function renderRanking() {
 }
 $("#ranking").addEventListener("click", (e) => {
   const r = e.target.closest(".rk"); if (!r) return;
+  openBotCard(r.dataset.id);
+});
+function openBotCard(id) {
   // Suchfilter leeren, sonst ist die Karte des Bots evtl. ausgeblendet
   S.search = ""; $("#search").value = ""; $("#topSearch").value = "";
   setView("bots", "cards");
-  const card = document.querySelector(`.bot[data-id="${CSS.escape(r.dataset.id)}"]`);
+  const card = document.querySelector(`.bot[data-id="${CSS.escape(id)}"]`);
   if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1600); }
-});
-
-function renderActivity() {
-  const rows = S.report.recent_trades || [];
-  $("#activity").innerHTML = rows.map((r) => `<div class="act">
-      <span class="ic ${cls(r.net)}">${r.net >= 0 ? "▲" : "▼"}</span>
-      <span class="nm">${esc(r.bot)}<small>${esc(r.symbol)} · ${r.direction === "buy" ? "Buy" : "Sell"} ${nf(2).format(r.volume)} · ${esc(r.account)}</small></span>
-      <span class="v"><b class="${cls(r.net)}">${signed(r.net, r.currency)}</b><small>${fmtDate(r.time)}</small></span>
-    </div>`).join("") || `<div class="empty-chart">Keine Trades im Zeitraum</div>`;
 }
+
+// Ein Eintrag pro Bot: Netto aller Trades im Zeitraum plus offene Positionen, statt einzelner Trades
+function renderBotResults() {
+  const bots = [...S.report.bots].sort((a, b) => b.result - a.result);
+  const sums = {};
+  bots.forEach((b) => { sums[b.currency] = (sums[b.currency] ?? 0) + b.result; });
+  $("#botResults").innerHTML = bots.map((b) => `<button class="act" data-id="${esc(b.id)}" title="Klick öffnet die Bot-Karte">
+      <span class="ic ${cls(b.result)}">${b.result >= 0 ? "▲" : "▼"}</span>
+      <span class="nm">${esc(b.name)}<small>${esc(b.accounts.join(", "))} · ${b.trades} Trade${b.trades === 1 ? "" : "s"}${b.open_count ? ` · ${b.open_count} offen` : ""}</small></span>
+      <span class="v"><b class="${cls(b.result)}">${signed(b.result, b.currency)}</b><small>${b.open_count ? `realisiert ${signed(b.net)} · offen ${signed(b.floating)}` : "realisiert"}</small></span>
+    </button>`).join("") + `<div class="act-sums">` + Object.entries(sums).sort().map(([cur, v]) => `<div class="act act-sum">
+      <span class="ic">Σ</span><span class="nm">Summe aller Bots<small>${esc(cur)}</small></span>
+      <span class="v"><b class="${cls(v)}">${signed(v, cur)}</b></span></div>`).join("") + `</div>`;
+  if (!bots.length) $("#botResults").innerHTML = `<div class="empty-chart">Keine Bots im Zeitraum</div>`;
+}
+$("#botResults").addEventListener("click", (e) => {
+  const r = e.target.closest(".act[data-id]"); if (!r) return;
+  openBotCard(r.dataset.id);
+});
 
 // Kalender (Dashboard und Analyse teilen sich den Monat)
 function renderCalendar() {
