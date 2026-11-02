@@ -60,6 +60,29 @@ Auf anderen Geräten gibt es zwei Wege:
   Einstellungen und „Beenden“ gehen nur am PC selbst.
 - Wer das Dashboard nur lokal haben will: mit `--local` starten.
 
+### Als App aufs Handy (iPhone / Android)
+
+Das Dashboard lässt sich wie eine App auf den Home-Bildschirm legen. Auf dem Handy hat es eine Navigationsleiste
+unten (Dashboard, Bots, Konten, Analyse, Einstellungen), Untermenüs öffnen sich als Blatt darüber.
+
+1. Handy ins **selbe WLAN** wie den Trading-PC, die Adresse „Im Netzwerk“ aus dem Konsolenfenster öffnen
+   (z. B. `http://192.168.1.20:8765/`).
+2. **iPhone (Safari):** Teilen-Symbol → **„Zum Home-Bildschirm“**. Das Dashboard startet dann als eigene App im
+   Vollbild, ohne Safari-Leisten.
+   **Android (Chrome):** Menü ⋮ → **„Zum Startbildschirm hinzufügen“**.
+3. Kommt die App nach einer Pause in den Vordergrund, lädt sie sofort neu. Wurde die exe neu gestartet, holt sie sich
+   den neuen Zugang automatisch. Ist der PC nicht erreichbar (z. B. unterwegs), erscheint oben ein Hinweis.
+
+Gut zu wissen:
+- Damit die Adresse gleich bleibt, im Router dem Trading-PC eine **feste IP** geben. Sonst zeigt das Icon nach einem
+  Router-Neustart evtl. ins Leere.
+- Browser erlauben den Offline-Speicher (Service Worker) nur über `https://` oder `localhost`. Über die normale
+  Heimnetz-Adresse `http://192.168…` gilt daher: iPhone läuft trotzdem als Vollbild-App, Android öffnet das Icon in
+  einem Chrome-Tab. Vollständige App-Installation inkl. „letzter Stand“ ohne Verbindung gibt es über HTTPS, z. B. mit
+  [Tailscale](https://tailscale.com) (`tailscale serve 8765`), das zusätzlich den Zugriff von unterwegs ermöglicht.
+- Am PC selbst (Chrome/Edge, `http://127.0.0.1:8765/`) kann man das Dashboard über das Installieren-Symbol in der
+  Adressleiste ebenfalls als eigenes Fenster installieren.
+
 Ausprobieren ohne MT5: `MT5-Bot-Dashboard.exe --demo` startet mit Beispieldaten.
 
 ### Wichtig: ein Terminal = ein eingeloggtes Konto

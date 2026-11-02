@@ -39,9 +39,28 @@ async function api(path, body) {
   const opt = { headers: { "X-Token": window.API_TOKEN } };
   if (body !== undefined) { opt.method = "POST"; opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; }
   const r = await fetch(path, opt);
+  if (body === undefined) S.offline = r.headers.get("X-Offline") === "1";
   const j = await r.json();
+  if (r.status === 403 && j.error === "unauthorized") reloadForNewToken();
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
+}
+
+// Nach einem Neustart der exe gilt ein neuer Zugangsschlüssel. Eine als App geöffnete Seite (Handy) lädt sich
+// dann neu, statt dauerhaft "unauthorized" zu zeigen – höchstens einmal pro Minute, damit nichts in Schleife läuft.
+function reloadForNewToken() {
+  try {
+    const last = +sessionStorage.getItem("tokenReload") || 0;
+    if (Date.now() - last < 60000) return;
+    sessionStorage.setItem("tokenReload", String(Date.now()));
+  } catch (e) { return; }
+  location.reload();
+}
+
+function setNetBanner(text) {
+  const b = $("#netBanner");
+  b.hidden = !text;
+  b.textContent = text || "";
 }
 
 // Farbverlauf zwischen zwei Hex-Farben (für die segmentierten Neon-Ringe)
@@ -100,6 +119,7 @@ async function load() {
     const [state, report] = await Promise.all([api("/api/state"), api("/api/report?" + query())]);
     if (seq !== loadSeq) return;
     S.state = state; S.report = report;
+    setNetBanner(S.offline ? "Keine Verbindung zum Trading-PC – angezeigt wird der zuletzt geladene Stand." : "");
     $("#btnQuit").hidden = state.remote;  // von anderen Geräten aus nicht den Server auf dem PC beenden
     // Filter auf inzwischen entfernte Konten verwerfen, sonst bliebe alles leer
     const keys = new Set(report.accounts.map((a) => a.key));
@@ -110,6 +130,8 @@ async function load() {
     render();
   } catch (e) {
     $("#sideStatus").innerHTML = `<span class="err">Verbindung zum Dashboard-Dienst verloren: ${esc(e.message)}</span>`;
+    if (seq === loadSeq) setNetBanner("Keine Verbindung zum Trading-PC" + (S.report ? " – angezeigt wird der zuletzt geladene Stand." :
+      ". Läuft die exe und ist das Handy im selben WLAN?"));
   }
 }
 
@@ -989,3 +1011,5 @@ let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT =
 }
 load();
 setInterval(() => { if (!accDialog.open && !document.querySelector("input.renaming")) load(); }, 10000);
+// Handy-App: beim Zurückholen in den Vordergrund sofort aktualisieren statt bis zu 10 s alten Stand zu zeigen
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });

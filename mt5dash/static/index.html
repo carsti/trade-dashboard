@@ -2,9 +2,17 @@
 <html lang="de" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MT5 Bot Dashboard</title>
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<!-- Als App auf dem Handy installierbar (Zum Home-Bildschirm / App installieren) -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#120827">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MT5 Bots">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="stylesheet" href="/static/style.css">
 <script>
   window.API_TOKEN = "__TOKEN__";
@@ -115,6 +123,7 @@
       </div>
     </header>
 
+    <div id="netBanner" class="net-banner" role="status" hidden></div>
     <div id="filterBar" class="filter-bar" hidden></div>
 
     <main>
@@ -266,5 +275,9 @@
 </dialog>
 
 <script src="/static/app.js"></script>
+<script>
+  // Service Worker: nur in sicherer Umgebung möglich (localhost oder HTTPS), im Heimnetz per http:// ignoriert der Browser ihn
+  if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
 </body>
 </html>

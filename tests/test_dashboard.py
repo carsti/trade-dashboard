@@ -242,3 +242,38 @@ class SourceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AppInstallTest(unittest.TestCase):
+    """Handy-App (PWA): Manifest, Service Worker und Icons werden ausgeliefert."""
+
+    def test_pwa_files_are_served(self):
+        import json
+        import threading
+        import urllib.request
+
+        from mt5dash import server
+        cfg = server.Config.__new__(server.Config)
+        cfg.data = {"accounts": []}
+        httpd, _ = server.serve(server.AppState(cfg, demo=False), 0, "127.0.0.1")
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{httpd.server_address[1]}"
+        try:
+            def get(path):
+                with urllib.request.urlopen(base + path) as r:
+                    return r.headers["Content-Type"], r.read()
+
+            ctype, body = get("/manifest.webmanifest")
+            self.assertTrue(ctype.startswith("application/manifest+json"))
+            man = json.loads(body)
+            self.assertEqual(man["display"], "standalone")
+            for icon in man["icons"]:
+                self.assertEqual(get(icon["src"])[0].split(";")[0], icon["type"])
+            ctype, body = get("/sw.js")
+            self.assertTrue(ctype.startswith("text/javascript"))
+            self.assertIn(b"fetch", body)
+            self.assertEqual(get("/apple-touch-icon.png")[0], "image/png")
+            self.assertIn(b'rel="manifest"', get("/")[1])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
