@@ -21,7 +21,6 @@ DEAL_ENTRY_OUT_BY = 3
 
 MANUAL_NAME = "Manuell"
 DAY = 86400
-RECENT_TRADES = 15
 
 
 def deal_net(d: dict) -> float:
@@ -199,7 +198,6 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
     entries: dict[tuple, dict] = {}
     accounts_out = []
     per_cur: dict[str, dict] = {}   # Währung → Konto-Summen, Startkapital, alle/realisierte Positionen
-    recent: list[dict] = []
 
     for snap in snapshots:
         acc = snap["account"]
@@ -256,12 +254,6 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
             c["base"] += start_balance or 0.0
             c["all"] += closed_all
             c["period"] += in_period
-            for p in sorted(in_period, key=lambda p: p["close_time"])[-RECENT_TRADES:]:
-                recent.append({
-                    "time": p["close_time"], "account": acc["label"], "currency": currency,
-                    "bot": resolve_bot_name(key, p["magic"], names, comments_by_magic[p["magic"]]),
-                    "symbol": p["symbol"], "direction": p["direction"], "volume": p["volume"], "net": p["net"],
-                })
             c["open_count"] += len(snap.get("open_positions", []))
 
         accounts_out.append({
@@ -286,6 +278,8 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
             **stats,
             "return_pct": _pct(stats["net"], e["base"]),
             "floating": round(e["floating"], 2), "open_count": e["open_count"],
+            # aktuelles Gesamtergebnis des Bots: alle Trades im Zeitraum verrechnet plus offene Positionen
+            "result": round(stats["net"] + e["floating"], 2),
             "curve": _curve(e["closed"]),
         })
     bots.sort(key=lambda b: b["net"], reverse=True)
@@ -323,6 +317,4 @@ def build_report(snapshots: list[dict], names: dict, t_from: int | None, t_to: i
             t["max_drawdown"] = _max_drawdown([v for _, v in daily])
             t.update(_breakdowns(c["period"]))
 
-    recent.sort(key=lambda r: r["time"], reverse=True)
-    return {"bots": bots, "accounts": accounts_out, "totals": sorted(totals.values(), key=lambda t: t["currency"]),
-            "recent_trades": recent[:RECENT_TRADES]}
+    return {"bots": bots, "accounts": accounts_out, "totals": sorted(totals.values(), key=lambda t: t["currency"])}
