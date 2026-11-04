@@ -1,0 +1,23 @@
+{
+  "name": "MT5 Bot Dashboard",
+  "short_name": "MT5 Bots",
+  "description": "Welcher Bot macht Gewinn, welcher Verlust – alle MetaTrader 5-Konten auf einen Blick.",
+  "lang": "de",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c061c",
+  "theme_color": "#120827",
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Bots", "url": "/#/bots/karten", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Analyse", "url": "/#/analyse", "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

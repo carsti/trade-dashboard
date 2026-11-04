@@ -423,3 +423,59 @@ dialog::backdrop { background: rgba(8, 3, 16, .65); }
   .acc-head { flex-wrap: wrap; }
   .acc-head .spacer { display: none; }
 }
+
+/* ================= Verbindungshinweis ================= */
+.net-banner { margin: 10px 24px 0; padding: 8px 12px; border-radius: 10px; font-size: 13px;
+  background: color-mix(in srgb, var(--warn) 18%, var(--surface-1)); border: 1px solid var(--warn); color: var(--text-primary); }
+
+/* ================= Handy: untere Navigationsleiste, kompakte Kopfzeile ================= */
+@media (max-width: 700px) {
+  body { -webkit-tap-highlight-color: transparent; }
+  .shell { display: block; }
+  .shell .sidebar {
+    position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 40; height: auto; flex: none;
+    flex-direction: row; overflow: visible; border-right: 0; border-top: 1px solid var(--border);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--sidebar) 92%, transparent); backdrop-filter: blur(12px);
+  }
+  .shell .brand, .shell .side-foot, .shell .caret { display: none !important; }
+  .shell .menu { flex-direction: row; flex: 1; gap: 0; }
+  .shell .menu > .item, .shell .menu > .group { flex: 1; min-width: 0; }
+  .shell .sidebar .item {
+    flex-direction: column; justify-content: center; gap: 3px; padding: 6px 2px; min-height: 52px;
+    font-size: 10px; letter-spacing: .2px; text-transform: none; text-align: center;
+  }
+  .shell .sidebar .item span { display: block !important; flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .shell .sidebar .item svg { width: 22px; height: 22px; }
+  .shell .sidebar .item.on { box-shadow: inset 0 2px 0 var(--neon-2); background: linear-gradient(0deg, transparent, color-mix(in srgb, var(--neon-2) 18%, transparent)); }
+  /* Untermenüs als Blatt über der Leiste */
+  .shell .sidebar .sub { display: none !important; }
+  .shell .sidebar .group.open .sub {
+    display: flex !important; position: fixed; left: 8px !important; right: 8px; top: auto !important;
+    bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 41; min-width: 0; padding: 8px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 -8px 30px rgba(0,0,0,.45);
+  }
+  .shell .sidebar .sub button { padding: 12px; font-size: 15px; }
+  .shell .sidebar .mode button { padding: 8px; font-size: 14px; }
+
+  .content { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .topbar { position: static; gap: 8px; padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: 10px; }
+  .search { flex-basis: 100%; max-width: none; }
+  .search input { font-size: 16px; } /* < 16px zoomt iOS beim Tippen in das Feld */
+  .toolbar { width: 100%; }
+  #periodSeg { display: flex; width: 100%; }
+  #periodSeg button { flex: 1; padding: 6px 2px; }
+  .net-banner { margin: 10px 16px 0; }
+  main { padding-top: 14px; gap: 12px; }
+
+  /* drei Ringe nebeneinander statt 2 + 1 */
+  .row-top { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .row-top .hero, .row-top #accBars { grid-column: 1 / -1; }
+  .row-top .gauge-card { padding-left: 6px; padding-right: 6px; }
+  .gauge-card svg { width: 84px; height: 84px; }
+  .gauge-card .g-title { font-size: 10px; letter-spacing: .4px; }
+  .gauge-card .g-text { font-size: 10px; }
+}
+@media (display-mode: standalone) and (max-width: 700px) {
+  .shell .sidebar .item { min-height: 56px; }
+}

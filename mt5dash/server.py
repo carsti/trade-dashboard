@@ -19,7 +19,7 @@ from .config import Config, config_dir
 
 APP_ID = "mt5-bot-dashboard"
 DISCOVERY_PORT = 8764  # UDP: andere Geräte finden darüber das Dashboard im Netzwerk
-VERSION = "6"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
+VERSION = "7"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
 
 
 def static_dir() -> Path:
@@ -125,6 +125,10 @@ def _int_or_none(v):
         return None
 
 
+STATIC_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+                ".svg": "image/svg+xml", ".ico": "image/x-icon", ".png": "image/png",
+                ".webmanifest": "application/manifest+json; charset=utf-8"}
+
 # POST-Aufrufe, die auch andere Geräte im Netz ausführen dürfen (nur Anzeige, keine Konten/Pfade/Beenden).
 REMOTE_POST_PATHS = {"/api/refresh", "/api/mode", "/api/bot-name"}
 
@@ -169,12 +173,17 @@ def make_handler(state: AppState, token: str):
             if u.path in ("/", "/index.html"):
                 html = (static_dir() / "index.html").read_text(encoding="utf-8").replace("__TOKEN__", token)
                 return self._send(200, html.encode(), "text/html; charset=utf-8")
+            # App-Installation (PWA): Manifest und Service Worker müssen im Wurzelverzeichnis liegen
+            if u.path in ("/sw.js", "/manifest.webmanifest"):
+                ctype = "text/javascript" if u.path == "/sw.js" else "application/manifest+json"
+                return self._send(200, (static_dir() / u.path[1:]).read_bytes(), ctype + "; charset=utf-8")
+            if u.path in ("/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/favicon.ico"):
+                name = "icon.ico" if u.path == "/favicon.ico" else "apple-touch-icon.png"
+                return self._send(200, (static_dir() / name).read_bytes(), STATIC_TYPES[Path(name).suffix])
             if u.path.startswith("/static/"):
                 f = (static_dir() / u.path[len("/static/"):]).resolve()
                 if static_dir().resolve() in f.parents and f.is_file():
-                    ctype = {".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml",
-                             ".ico": "image/x-icon"}.get(f.suffix, "application/octet-stream")
-                    return self._send(200, f.read_bytes(), ctype + "; charset=utf-8")
+                    return self._send(200, f.read_bytes(), STATIC_TYPES.get(f.suffix, "application/octet-stream"))
                 return self._send(404, b"not found", "text/plain")
             if not u.path.startswith("/api/"):
                 return self._send(404, b"not found", "text/plain")
