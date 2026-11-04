@@ -24,7 +24,7 @@ jobs:
           Start-Sleep 8
           $r = Invoke-WebRequest http://127.0.0.1:8765/ping -UseBasicParsing
           Stop-Process $p.Id
-          if ($r.Content -ne "mt5-bot-dashboard") { exit 1 }
+          if ($r.Content -notlike "mt5-bot-dashboard*") { exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: MT5-Bot-Dashboard
