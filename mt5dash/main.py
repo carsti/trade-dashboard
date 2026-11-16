@@ -11,7 +11,7 @@ import webbrowser
 from .server import (APP_ID, VERSION, AppState, answer_discovery, find_dashboard, lan_ip, make_config,
                      serve)
 
-DEFAULT_PORT = 8765
+DEFAULT_PORT = 8766
 
 
 def _running_instance(port: int) -> str | None:
