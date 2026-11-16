@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Chart bars icon in neon purple -->
+    <path
+        android:pathData="M20,80 L20,50 L35,50 L35,80 Z"
+        android:fillColor="#9B59F5"/>
+    <path
+        android:pathData="M42,80 L42,30 L57,30 L57,80 Z"
+        android:fillColor="#9B59F5"/>
+    <path
+        android:pathData="M64,80 L64,45 L79,45 L79,80 Z"
+        android:fillColor="#9B59F5"/>
+    <!-- Trend line -->
+    <path
+        android:pathData="M20,65 Q42,35 64,55 L79,42"
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="3"
+        android:fillColor="@android:color/transparent"/>
+</vector>

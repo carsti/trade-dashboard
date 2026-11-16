@@ -7,6 +7,7 @@ const S = {
   accFilter: new Set(),  // Konto-Keys; leer = alle Konten
   sort: { key: "net", asc: false }, search: "",
   selected: new Set(), selectionTouched: false,
+  collapsed: new Set(),  // zugeklappte Konto-Gruppen in Karten/Tabelle
   colors: {},            // Bot-ID → Farbslot, nur für Bots im Vergleich (folgt dem Bot, nicht dem Rang)
   calMonth: null,        // [Jahr, Monat]; null = Monat des letzten Handelstags
 };
@@ -425,6 +426,8 @@ $("#ranking").addEventListener("click", (e) => {
 function openBotCard(id) {
   // Suchfilter leeren, sonst ist die Karte des Bots evtl. ausgeblendet
   S.search = ""; $("#search").value = ""; $("#topSearch").value = "";
+  const bot = S.report.bots.find((b) => b.id === id);
+  if (bot) S.collapsed.delete(accGroupKey(bot));
   setView("bots", "cards");
   const card = document.querySelector(`.bot[data-id="${CSS.escape(id)}"]`);
   if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1600); }
@@ -518,7 +521,12 @@ function renderLines() {
   const bots = chosen.filter((b) => b.curve.length && colorOf(b.id) && b.currency === S.cur);
   const hidden = chosen.length - bots.length;
   if (!bots.length) { leg.innerHTML = ""; el.innerHTML = `<div class="empty-chart">Bei den Bots unten „Vergleichen“ anhaken, um den Verlauf zu sehen</div>`; return; }
-  leg.innerHTML = bots.map((b) => `<span><i style="background:${colorOf(b.id)}"></i>${esc(b.name)} <span class="muted">· ${esc(S.group === "account" ? b.accounts[0] : b.currency)}</span></span>`).join("") +
+  // Legende je MT5-Konto; bei mehreren Konten unterscheidet zusätzlich die Strichart das Konto
+  const groups = byAccount(bots), multi = groups.length > 1;
+  const dashOf = (b) => multi ? DASHES[groups.findIndex((g) => g.bots.includes(b)) % DASHES.length] : "";
+  const swatch = (b) => `<svg class="ln" viewBox="0 0 18 6" aria-hidden="true"><line x1="1" y1="3" x2="17" y2="3" stroke="${colorOf(b.id)}" stroke-width="2.5" stroke-dasharray="${dashOf(b)}"/></svg>`;
+  leg.innerHTML = groups.map((g) => `<div class="leg-acc"><b>${esc(g.title)}${DASH_NAMES[DASHES.indexOf(dashOf(g.bots[0]))] ? ` <span class="muted">(${DASH_NAMES[DASHES.indexOf(dashOf(g.bots[0]))]})</span>` : ""}</b>` +
+    g.bots.map((b) => `<span>${swatch(b)}${esc(b.name)}</span>`).join("") + `</div>`).join("") +
     (hidden ? `<span class="muted">${hidden} ausgeblendet (andere Währung als ${esc(S.cur)})</span>` : "");
   const [pf] = periodRange();
   const allT = bots.flatMap((b) => b.curve.map((p) => p[0]));
@@ -527,15 +535,59 @@ function renderLines() {
   let s = f.svg;
   for (const b of bots) {
     const pts = [[t0, 0], ...b.curve];
-    s += `<path d="M${pts.map((p) => `${f.x(p[0]).toFixed(1)},${f.y(p[1]).toFixed(1)}`).join("L")}" fill="none" stroke="${colorOf(b.id)}" stroke-width="2" stroke-linejoin="round"/>`;
+    s += `<path d="M${pts.map((p) => `${f.x(p[0]).toFixed(1)},${f.y(p[1]).toFixed(1)}`).join("L")}" fill="none" stroke="${colorOf(b.id)}" stroke-width="2" stroke-linejoin="round"${dashOf(b) ? ` stroke-dasharray="${dashOf(b)}"` : ""}/>`;
   }
   el.innerHTML = `<svg viewBox="0 0 ${f.W} ${f.H}" height="${f.H}" role="img" aria-label="Kumulierter P&L je Bot">${s}${hairSvg(f)}</svg>`;
   crosshair(el, f, t0, t1, (e, t, px, dots) => {
     const rows = bots.map((b) => ({ b, v: valueAt(b.curve, t) })).sort((a, c) => c.v - a.v);
     dots.innerHTML = rows.map(({ b, v }) => `<circle cx="${px}" cy="${f.y(v)}" r="4" fill="${colorOf(b.id)}" stroke="var(--surface-1)" stroke-width="2"/>`).join("");
-    showTip(e, `<b>${fmtDay(t)}</b>` + rows.map(({ b, v }) => `<div class="row"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${colorOf(b.id)};margin-right:5px"></span>${esc(trunc(b.name, 24))}</span><span>${signed(v, b.currency)}</span></div>`).join(""));
+    showTip(e, `<b>${fmtDay(t)}</b>` + rows.map(({ b, v }) => `<div class="row"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${colorOf(b.id)};margin-right:5px"></span>${esc(trunc(b.name, 24))}${multi ? ` <span class="muted">· ${esc(trunc(accGroup(b).title, 16))}</span>` : ""}</span><span>${signed(v, b.currency)}</span></div>`).join(""));
   });
 }
+// ===== Gliederung nach MT5-Konto =====
+// Pro Konto ist jeder Bot genau einem Konto zugeordnet; „zusammengefasst“ kann ein Bot auf mehreren Konten
+// laufen, dann bekommt diese Kontokombination eine eigene Gruppe.
+const DASHES = ["", "7 4", "2 3", "10 3 2 3"], DASH_NAMES = ["", "gestrichelt", "gepunktet", "Strich-Punkt"];
+const accGroupKey = (b) => b.account_keys.join("+");
+function accGroup(b) {
+  const accs = b.account_keys.map((k) => S.report.accounts.find((a) => a.key === k)).filter(Boolean);
+  const one = accs.length === 1 ? accs[0] : null;
+  return {
+    key: accGroupKey(b), accs,
+    title: one ? one.label : b.accounts.join(" + "),
+    meta: one ? `${one.login} · ${one.server}` : `auf ${b.accounts.length} Konten zusammengefasst`,
+  };
+}
+function byAccount(rows) {
+  const groups = new Map(), order = new Map(S.report.accounts.map((a, i) => [a.key, i]));
+  for (const b of rows) {
+    const k = accGroupKey(b);
+    if (!groups.has(k)) groups.set(k, { ...accGroup(b), bots: [] });
+    groups.get(k).bots.push(b);
+  }
+  // Reihenfolge wie in der Kontoliste, Kombinationen aus mehreren Konten am Ende
+  const pos = (g) => g.accs.length === 1 ? order.get(g.accs[0].key) : 1e3 + g.accs.length;
+  return [...groups.values()].sort((a, b) => pos(a) - pos(b));
+}
+function accHead(g) {
+  const sums = {};
+  for (const b of g.bots) sums[b.currency] = (sums[b.currency] || 0) + b.net;
+  const st = g.accs.length === 1 ? g.accs[0].status : null;
+  const won = g.bots.filter((b) => b.net > 0).length, lost = g.bots.filter((b) => b.net < 0).length;
+  const sel = g.bots.filter((b) => S.selected.has(b.id)).length, open = !S.collapsed.has(g.key);
+  return `<button class="acc-head" data-acc-group="${esc(g.key)}" aria-expanded="${open}">
+    <em class="caret"></em>${st ? `<span class="dot ${st || "wait"}"></span>` : ""}
+    <span class="ttl"><b>${esc(g.title)}</b><small>${esc(g.meta)}</small></span>
+    <span class="spacer"></span>
+    <span class="meta">${g.bots.length} ${g.bots.length === 1 ? "Bot" : "Bots"} · <span class="pos">▲ ${won}</span> · <span class="neg">▼ ${lost}</span>${sel ? ` · ${sel} im Vergleich` : ""}</span>
+    <span class="sum">${Object.entries(sums).map(([c, v]) => `<b class="${cls(v)}">${signed(v, c)}</b>`).join(" ")}</span>
+  </button>`;
+}
+function toggleAccGroup(key) {
+  S.collapsed.has(key) ? S.collapsed.delete(key) : S.collapsed.add(key);
+  renderBotsView();
+}
+
 function filteredSorted(bots) {
   const q = S.search.toLowerCase();
   const rows = bots.filter((b) => !q || (b.name + " " + b.accounts.join(" ") + " " + b.magics.join(" ") + " " + b.symbols.join(" ")).toLowerCase().includes(q));
@@ -547,32 +599,38 @@ function filteredSorted(bots) {
     return asc ? r : -r;
   });
 }
-const subline = (b) => `Magic ${b.magics.join(", ")} · ${b.accounts.join(", ")}${b.symbols.length ? " · " + b.symbols.slice(0, 3).join(", ") : ""}`;
+// das Konto steht schon in der Gruppenüberschrift
+const subline = (b) => `Magic ${b.magics.join(", ")}${b.symbols.length ? " · " + b.symbols.slice(0, 3).join(", ") : ""}`;
 const selBox = (b) => `<input type="checkbox" class="sel" ${S.selected.has(b.id) ? "checked" : ""} ${!S.selected.has(b.id) && S.selected.size >= SERIES.length ? `disabled title="Höchstens ${SERIES.length} Bots gleichzeitig vergleichen"` : ""} aria-label="Im Vergleich anzeigen">`;
 function renderCards(bots) {
-  $("#botCards").innerHTML = filteredSorted(bots).map((b) => {
-    const color = colorOf(b.id), fl = flags(b);
-    const tags = (b.trades ? [`<span class="pill ${cls(b.net)}">${b.net > 0 ? "▲ Profitabel" : "▼ Verlust"}</span>`] : [])
-      .concat(fl.map((x) => `<span class="pill ${x.k}" title="${esc(x.d)}">${x.t}</span>`)).join("");
-    return `<div class="panel bot" data-id="${esc(b.id)}">
-      <div class="head"><span class="swatch" style="background:${color || "transparent"};${color ? "" : "border:1px solid var(--border)"}"></span>
-        <div class="nm" title="Klicken zum Umbenennen">${esc(b.name)}<small>${esc(subline(b))}</small></div>
-        <div class="tags">${tags}</div></div>
-      <div class="mid"><div><div class="value ${cls(b.net)}">${signed(b.net, b.currency)}</div><div class="small muted">${pct(b.return_pct)} vom Konto</div></div>
-        ${sparkSvg(b.curve, color || css("--neon-2"))}</div>
-      <div class="stats">
-        <div>Trades<b>${b.trades}</b></div>
-        <div>Treffer<b>${b.win_rate == null ? "–" : nf(0).format(b.win_rate) + " %"}</b></div>
-        <div>PF<b class="${b.profit_factor == null ? "" : b.profit_factor >= 1 ? "pos" : "neg"}">${b.profit_factor == null ? "–" : nf(2).format(b.profit_factor)}</b></div>
-        <div>Max. DD<b>${short(b.max_drawdown)}</b></div>
-      </div>
-      ${fl.filter((x) => x.k === "warn").map((x) => `<div class="warnline">${esc(x.d)}</div>`).join("")}
-      <div class="foot"><label>${selBox(b)} Vergleichen</label><span class="spacer"></span>
-        ${b.open_count ? `Offen <b class="${cls(b.floating)}">${signed(b.floating)}</b> (${b.open_count}) · ` : ""}Letzter Trade ${fmtDate(b.last_trade)}</div>
-    </div>`;
-  }).join("") || `<div class="panel muted">Keine Bots gefunden</div>`;
+  const groups = byAccount(filteredSorted(bots));
+  $("#botCards").innerHTML = groups.map((g) => `<section class="acc-group${S.collapsed.has(g.key) ? " closed" : ""}">${accHead(g)}
+    <div class="bot-cards"${S.collapsed.has(g.key) ? " hidden" : ""}>${g.bots.map(cardHtml).join("")}</div></section>`).join("") ||
+    `<div class="panel muted">Keine Bots gefunden</div>`;
+}
+function cardHtml(b) {
+  const color = colorOf(b.id), fl = flags(b);
+  const tags = (b.trades ? [`<span class="pill ${cls(b.net)}">${b.net > 0 ? "▲ Profitabel" : "▼ Verlust"}</span>`] : [])
+    .concat(fl.map((x) => `<span class="pill ${x.k}" title="${esc(x.d)}">${x.t}</span>`)).join("");
+  return `<div class="panel bot" data-id="${esc(b.id)}">
+    <div class="head"><span class="swatch" style="background:${color || "transparent"};${color ? "" : "border:1px solid var(--border)"}"></span>
+      <div class="nm" title="Klicken zum Umbenennen">${esc(b.name)}<small>${esc(subline(b))}</small></div>
+      <div class="tags">${tags}</div></div>
+    <div class="mid"><div><div class="value ${cls(b.net)}">${signed(b.net, b.currency)}</div><div class="small muted">${pct(b.return_pct)} vom Konto</div></div>
+      ${sparkSvg(b.curve, color || css("--neon-2"))}</div>
+    <div class="stats">
+      <div>Trades<b>${b.trades}</b></div>
+      <div>Treffer<b>${b.win_rate == null ? "–" : nf(0).format(b.win_rate) + " %"}</b></div>
+      <div>PF<b class="${b.profit_factor == null ? "" : b.profit_factor >= 1 ? "pos" : "neg"}">${b.profit_factor == null ? "–" : nf(2).format(b.profit_factor)}</b></div>
+      <div>Max. DD<b>${short(b.max_drawdown)}</b></div>
+    </div>
+    ${fl.filter((x) => x.k === "warn").map((x) => `<div class="warnline">${esc(x.d)}</div>`).join("")}
+    <div class="foot"><label>${selBox(b)} Vergleichen</label><span class="spacer"></span>
+      ${b.open_count ? `Offen <b class="${cls(b.floating)}">${signed(b.floating)}</b> (${b.open_count}) · ` : ""}Letzter Trade ${fmtDate(b.last_trade)}</div>
+  </div>`;
 }
 $("#botCards").addEventListener("click", (e) => {
+  const head = e.target.closest(".acc-head"); if (head) return toggleAccGroup(head.dataset.accGroup);
   const card = e.target.closest(".bot[data-id]"); if (!card) return;
   const bot = S.report.bots.find((b) => b.id === card.dataset.id);
   if (e.target.classList.contains("sel")) return toggleSel(bot, e.target.checked);
@@ -588,9 +646,9 @@ const COLS = [
   { k: "last_trade", t: "Letzter Trade", num: true },
 ];
 function renderTable(bots) {
-  const rows = filteredSorted(bots), { asc } = S.sort;
+  const groups = byAccount(filteredSorted(bots)), { asc } = S.sort;
   const head = `<thead><tr>${COLS.map((c) => `<th data-k="${c.k}" class="${c.num ? "num" : ""} ${S.sort.key === c.k ? "sorted" + (asc ? " asc" : "") : ""}">${c.t}</th>`).join("")}</tr></thead>`;
-  const body = rows.map((b) => {
+  const row = (b) => {
     const color = colorOf(b.id);
     return `<tr data-id="${esc(b.id)}">
       <td>${selBox(b)}</td>
@@ -607,10 +665,14 @@ function renderTable(bots) {
       <td class="num ${cls(b.floating)}">${b.open_count ? signed(b.floating) + ` <span class="muted">(${b.open_count})</span>` : "–"}</td>
       <td class="num">${fmtDate(b.last_trade)}</td>
     </tr>`;
-  }).join("");
+  };
+  // innerhalb jedes Kontos sortiert, Konten bleiben getrennt
+  const body = groups.map((g) => `<tr class="acc-row"><td colspan="${COLS.length}">${accHead(g)}</td></tr>` +
+    (S.collapsed.has(g.key) ? "" : g.bots.map(row).join(""))).join("");
   $("#botTable").innerHTML = head + `<tbody>${body || `<tr><td colspan="${COLS.length}" class="muted">Keine Bots gefunden</td></tr>`}</tbody>`;
 }
 $("#botTable").addEventListener("click", (e) => {
+  const head = e.target.closest(".acc-head"); if (head) return toggleAccGroup(head.dataset.accGroup);
   const th = e.target.closest("th");
   if (th) {
     const c = COLS.find((c) => c.k === th.dataset.k);

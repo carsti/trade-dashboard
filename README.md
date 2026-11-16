@@ -27,6 +27,8 @@ ohne Python-Installation auf dem Zielrechner.
 - **Bots**: Karte pro Bot mit Mini-Kurve, Rendite, Trades, Treffer, PF, Max. DD und Hinweisen
   (⚠ Risiko bei Grid/Martingale-Muster: hohe Trefferquote, aber Ø Verlust ≥ 3× Ø Gewinn; ◷ Inaktiv nach 7 Tagen
   ohne Trade), alternativ Tabelle; Bot-Vergleich der kumulierten Kurven (beliebige 8 Bots gleichzeitig).
+  Karten und Tabelle sind nach **MT5-Konto** gegliedert (Überschrift mit Login, Server, Anzahl Bots im Plus/Minus und
+  Kontosumme, per Klick zuklappbar); im Vergleich ist die Legende nach Konto gruppiert und jedes Konto hat seine eigene Strichart.
 - **Analyse**: Ergebnis je Symbol, nach Wochentag und nach Uhrzeit (Serverzeit), großer Monatskalender.
 - Rendite in % bezieht sich auf die Balance zu Zeitraumbeginn plus Einzahlungen im Zeitraum (bei „Gesamt“ also auf
   die Summe der Einzahlungen). Auszahlungen senken die Basis nicht, abgezogene Gewinne verfälschen die Rendite also nicht.
@@ -109,3 +111,4 @@ Tests: `python -m unittest discover -s tests -t .`
 | `mt5dash/server.py` | HTTP-Server (lokal und im Heimnetz, mit Zugriffstoken; Änderungen an Konten nur lokal) und JSON-API |
 | `mt5dash/static/` | Oberfläche (HTML/CSS/JS, keine externen Abhängigkeiten, läuft offline) |
 | `mt5dash/demo_source.py` | Beispieldaten für `--demo` |
+# TradingDesk
