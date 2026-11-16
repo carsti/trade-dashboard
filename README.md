@@ -37,7 +37,7 @@ ohne Python-Installation auf dem Zielrechner.
 
 1. Auf dem PC muss das **MetaTrader 5-Terminal installiert** sein. Die MT5-Python-Schnittstelle spricht immer mit
    einem lokalen Terminal.
-2. `MT5-Bot-Dashboard.exe` starten. Der Browser öffnet sich mit `http://127.0.0.1:47615/`.
+2. `MT5-Bot-Dashboard.exe` starten. Der Browser öffnet sich mit `http://127.0.0.1:8766/`.
    Das Konsolenfenster zeigt den Status und die Adresse im Netzwerk. Zum Beenden das Fenster schließen oder im Dashboard
    „Beenden“ klicken.
 3. **Konten** → Konto hinzufügen → „Speichern & verbinden“.
@@ -50,7 +50,7 @@ Auf anderen Geräten gibt es zwei Wege:
 - **Dieselbe exe starten** (auf jedem Windows-PC): Sind auf dem Gerät keine Konten eingerichtet, sucht die exe das
   Dashboard im Netzwerk und öffnet es im Browser. Mit `--server` startet sie stattdessen immer ein eigenes Dashboard.
 - **Nur Browser** (Handy, Tablet, Mac): die Adresse öffnen, die das Konsolenfenster auf dem Trading-PC unter
-  „Im Netzwerk“ anzeigt, z. B. `http://192.168.1.20:47615/`.
+  „Im Netzwerk“ anzeigt, z. B. `http://192.168.1.20:8766/`.
 
 - Beim ersten Start fragt die Windows-Firewall nach: **„Private Netzwerke“ zulassen**. Wurde das abgelehnt, unter
   *Windows-Sicherheit → Firewall → Zugriff von Apps durch die Firewall zulassen* nachholen.
