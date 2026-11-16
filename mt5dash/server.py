@@ -18,7 +18,7 @@ from . import analytics, demo_source, mt5_source
 from .config import Config, config_dir
 
 APP_ID = "mt5-bot-dashboard"
-DISCOVERY_PORT = 8764  # UDP: andere Geräte finden darüber das Dashboard im Netzwerk
+DISCOVERY_PORT = 47614  # UDP: andere Geräte finden darüber das Dashboard im Netzwerk
 VERSION = "5"  # bei Oberflächen-Änderungen erhöhen, damit keine ältere laufende Instanz wiederverwendet wird
 
 
