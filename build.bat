@@ -3,7 +3,8 @@ REM Baut dist\MT5-Bot-Dashboard.exe  (Voraussetzung: Python 3.10-3.13 64-bit, ht
 setlocal
 cd /d "%~dp0"
 if not exist .venv (
-  py -3 -m venv .venv || python -m venv .venv || goto :err
+  REM MetaTrader5 gibt es nur fuer Python 3.10-3.13: passende Version bevorzugen
+  py -3.13 -m venv .venv 2>nul || py -3.12 -m venv .venv 2>nul || py -3.11 -m venv .venv 2>nul || py -3.10 -m venv .venv 2>nul || python -m venv .venv || goto :err
 )
 call .venv\Scripts\activate.bat || goto :err
 python -m pip install --upgrade pip >nul
